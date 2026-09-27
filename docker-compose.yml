@@ -1,0 +1,34 @@
+# dvbhub — pulls the prebuilt image from GitHub Container Registry.
+#   docker compose up -d        # install / start
+#   docker compose pull && docker compose up -d   # update
+services:
+  dvbhub:
+    image: ghcr.io/madmaxx636/dvbhub:latest
+    # To build from source instead of pulling, replace "image:" with:
+    # build: https://github.com/Madmaxx636/dvbhub.git
+    container_name: dvbhub
+    restart: unless-stopped
+    # Host networking lets Jellyfin/Plex find dvbhub via SSDP and keeps
+    # stream URLs identical inside and outside Docker. Without it, remove this
+    # line and uncomment "ports" (then enter the tuner URL by hand).
+    network_mode: host
+    # ports:
+    #   - "9980:9980"
+    volumes:
+      - ./data:/data
+    # DVB tuners: passes every adapter under /dev/dvb. Devices are captured
+    # when the container starts, so restart it after replugging a USB tuner.
+    devices:
+      - /dev/dvb:/dev/dvb
+    environment:
+      - TZ=Europe/London          # set yours; the EPG and guide use local time
+      # - DVBHUB_PASSWORD=change-me  # protect the admin UI (streams stay open)
+    # NVIDIA GPU for NVENC/NVDEC. Requires the NVIDIA Container Toolkit on the
+    # host. Delete this block if you have no NVIDIA GPU.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video, compute, utility]
