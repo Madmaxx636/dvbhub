@@ -82,6 +82,11 @@ func main() {
 	}
 
 	var vct []byte
+	type psipTable struct {
+		pid uint16
+		sec []byte
+	}
+	var atscTables []psipTable
 	if *atsc {
 		var chans []ts.VCTChannel
 		for _, kv := range strings.Split(*vcts, ",") {
@@ -94,12 +99,30 @@ func main() {
 			sid, _ := strconv.Atoi(k)
 			a, _ := strconv.Atoi(maj)
 			b, _ := strconv.Atoi(mnr)
-			chans = append(chans, ts.VCTChannel{ShortName: name, Major: a, Minor: b, TSID: uint16(*tsid), Program: uint16(sid), ServiceType: 0x02})
+			chans = append(chans, ts.VCTChannel{ShortName: name, Major: a, Minor: b, TSID: uint16(*tsid), Program: uint16(sid),
+				ServiceType: 0x02, SourceID: uint16(1000 + sid)})
 		}
 		vct = ts.BuildVCT(uint16(*tsid), 0, chans)
+		// PSIP guide: MGT pointing at EIT-0 and ETT-0, an STT, and 12 h of
+		// half-hour programmes per channel with descriptions.
+		const eitPID, ettPID = 0x1d00, 0x1e00
+		atscTables = append(atscTables, psipTable{ts.PIDPSIP, ts.BuildMGT([]ts.MGTTable{{Type: 0x0100, PID: eitPID}, {Type: 0x0200, PID: ettPID}})},
+			psipTable{ts.PIDPSIP, ts.BuildSTT(time.Now(), ts.DefaultGPSUTCOffset)})
+		base := time.Now().UTC().Truncate(30 * time.Minute).Add(-time.Hour)
+		for _, c := range chans {
+			var evs []ts.ATSCEvent
+			for i := 0; i < 24; i++ {
+				ev := ts.ATSCEvent{EventID: uint16(i + 1), Start: ts.GPSSeconds(base.Add(time.Duration(i)*30*time.Minute), ts.DefaultGPSUTCOffset),
+					Duration: 30 * time.Minute, Title: fmt.Sprintf("%s Show %d", c.ShortName, i+1)}
+				evs = append(evs, ev)
+				atscTables = append(atscTables, psipTable{ettPID, ts.BuildETT(c.SourceID, ev.EventID, 0, fmt.Sprintf("About %s show %d.", c.ShortName, i+1))})
+			}
+			atscTables = append(atscTables, psipTable{eitPID, ts.BuildATSCEIT(c.SourceID, 0, evs)})
+		}
 	}
 
-	var nitCC, eitCC, vctCC byte
+	var nitCC, eitCC byte
+	ccs := map[uint16]*byte{}
 	var outBuf []byte
 	n := 0
 	for i := 0; i+ts.PacketSize <= len(data); i += ts.PacketSize {
@@ -108,7 +131,12 @@ func main() {
 				continue
 			}
 			if n%*every == 0 {
-				outBuf = append(outBuf, ts.Packetize(ts.PIDPSIP, vct, &vctCC)...)
+				for _, t := range append([]psipTable{{ts.PIDPSIP, vct}}, atscTables...) {
+					if ccs[t.pid] == nil {
+						ccs[t.pid] = new(byte)
+					}
+					outBuf = append(outBuf, ts.Packetize(t.pid, t.sec, ccs[t.pid])...)
+				}
 			}
 		} else if n%*every == 0 {
 			outBuf = append(outBuf, ts.Packetize(ts.PIDNIT, nit, &nitCC)...)

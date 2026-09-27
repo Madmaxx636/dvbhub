@@ -179,6 +179,29 @@ check "VCT short names used" "[[ \$(curl -sf $B/api/services | j '\",\".join(sor
 curl -sf -X POST $B/api/map -d '{"includeRadio":false,"skipScrambled":true,"mergeByName":true}' >/dev/null
 check "channel numbered 3.1 in lineup" "curl -sf $B/lineup.json | j '[e.GuideNumber for e in d]' | grep -q \"'3.1'\""
 check "3.4 streams via /auto/v3.4" "[[ \$(curl -s --max-time 4 $B/auto/v3.4 | wc -c) -gt 100000 ]]"
+for i in $(seq 40); do
+  N=$(curl -sf $B/xmltv.xml | grep -c 'WTST-HD Show')
+  [[ $N -gt 10 ]] && break
+  sleep 1
+done
+echo "  ATSC guide programmes for 3.1: $N after ${i}s"
+check "ATSC PSIP guide collected (EIT)" "[[ $N -gt 10 ]]"
+check "ATSC guide descriptions (ETT)" "curl -sf $B/xmltv.xml | grep -q 'About WTST-HD show'"
+check "ATSC guide times are UTC-correct" "[[ \$(curl -sf $B/api/epg/grid | j 'min(abs((__import__(\"datetime\").datetime.fromisoformat(e.start.replace(\"Z\",\"+00:00\")).timestamp()) - __import__(\"time\").time()) for c in d.channels if c.name==\"WTST-HD\" for e in c.events) < 3700') == True ]]"
+
+echo "== dead stream frees its tuner (no signal for over 60 s)"
+curl -s --max-time 90 $B/auto/v3.1 -o /dev/null &
+CPID=$!
+sleep 4
+DT=$(subs_on "WTST-HD")
+echo "  WTST-HD on $DT; dropping its signal for 80 s"
+curl -sf -X POST "$B/api/tuners-drop/$DT?seconds=80" >/dev/null
+sleep 72
+LEFT=$(subs_on "WTST-HD")
+echo "  tuners still holding WTST-HD after 72 s without signal: ${LEFT:-none}"
+check "dead session ended and released its tuner" "[[ -z '$LEFT' ]] && grep -q 'ending session' $T/server.log"
+check "client connection was closed" "! kill -0 $CPID 2>/dev/null"
+kill $CPID 2>/dev/null; wait $CPID 2>/dev/null
 
 echo "== server log"
 grep -vE 'listening|admin UI|HDHomeRun:|M3U / XMLTV' $T/server.log | sed 's/^/  /'

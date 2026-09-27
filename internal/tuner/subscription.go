@@ -62,6 +62,16 @@ func newSubscription(m *Manager, id int, req Request) *Subscription {
 // Close ends the subscription.
 func (s *Subscription) Close() { s.end(nil) }
 
+// TuneTimeout is the lock timeout of the tuner this subscription is on.
+func (s *Subscription) TuneTimeout() time.Duration {
+	s.m.mu.Lock()
+	defer s.m.mu.Unlock()
+	if s.sess != nil && s.sess.tuner.cfg.TuneTimeout > 0 {
+		return time.Duration(s.sess.tuner.cfg.TuneTimeout) * time.Second
+	}
+	return 5 * time.Second
+}
+
 // Err returns why the subscription ended (nil if closed by the owner).
 func (s *Subscription) Err() error {
 	s.m.mu.Lock()

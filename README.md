@@ -66,4 +66,4 @@ To update: `docker compose pull && docker compose up -d`. Tagging a release (`gi
 
 ## Not verified yet
 
-The hardware code paths (`internal/dvb`) and NVENC have not been run against real hardware. The ioctl numbers and struct layouts were checked against the kernel headers, but real tuning, DiSEqC and signal statistics still need testing on the actual server. ATSC channel names and numbers are read from the PSIP VCT; the ATSC program guide (PSIP EIT) is not read yet, so use an XMLTV source for guide data.
+The hardware code paths (`internal/dvb`) and NVENC have not been run against real hardware. The ioctl numbers and struct layouts were checked against the kernel headers, but real tuning, DiSEqC and signal statistics still need testing on the actual server. ATSC channel names, numbers and the over-the-air program guide (PSIP EIT/ETT) are read from the broadcast.

@@ -322,6 +322,13 @@ func (s *session) keepalive() {
 	}
 	neverStreamed := !s.everData && s.tuneFailures > 0
 	s.mu.Unlock()
+	if outage > maxOutage {
+		log.Printf("tuner %s: no signal on %s for %s, ending session", s.tuner.src.Key(), MuxLabel(s.mux), outage.Round(time.Second))
+		s.m.mu.Lock()
+		s.stopLocked(errors.New("no signal"))
+		s.m.mu.Unlock()
+		return
+	}
 	for _, sub := range s.subscribers() {
 		sub.keepalive(s)
 		if !sub.raw && len(sub.req.Services) > 1 && (outage > failoverAfter || neverStreamed) &&

@@ -5,6 +5,7 @@
 package dvb
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -236,7 +237,7 @@ func OpenFrontend(adapter, index int) (*Frontend, error) {
 func (fe *Frontend) Close() error { return fe.f.Close() }
 
 // Tune programs the frontend and waits for lock.
-func (fe *Frontend) Tune(t store.Tuning, sat *store.SatInput, timeout time.Duration) error {
+func (fe *Frontend) Tune(ctx context.Context, t store.Tuning, sat *store.SatInput, timeout time.Duration) error {
 	ds, ok := delsysByName[strings.ToUpper(t.DeliverySystem)]
 	if !ok {
 		return fmt.Errorf("unsupported delivery system %q", t.DeliverySystem)
@@ -303,13 +304,17 @@ func (fe *Frontend) Tune(t store.Tuning, sat *store.SatInput, timeout time.Durat
 	if err := pl.call(fe.f, feSetProperty); err != nil {
 		return fmt.Errorf("FE_SET_PROPERTY: %w", err)
 	}
-	return fe.WaitLock(timeout)
+	return fe.WaitLock(ctx, timeout)
 }
 
-// WaitLock polls the frontend until it reports lock or the timeout expires.
-func (fe *Frontend) WaitLock(timeout time.Duration) error {
+// WaitLock polls the frontend until it reports lock, the timeout expires or
+// ctx is cancelled (so an abandoned tune frees the tuner at once).
+func (fe *Frontend) WaitLock(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		st, err := fe.status()
 		if err == nil && st&feHasLock != 0 {
 			return nil
@@ -320,7 +325,11 @@ func (fe *Frontend) WaitLock(timeout time.Duration) error {
 			}
 			return fmt.Errorf("no lock (status 0x%02x: %s)", st, strings.Join(statusNames(st), ","))
 		}
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 }
 

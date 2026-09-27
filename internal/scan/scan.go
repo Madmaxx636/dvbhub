@@ -136,7 +136,7 @@ func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error
 		}
 		return nil
 	})
-	var timeout time.Duration = 10 * time.Second
+	timeout := sub.TuneTimeout() + 5*time.Second
 	res := &result{pmts: map[uint16]*ts.PMT{}}
 	asm := map[uint16]*ts.SectionAssembler{
 		ts.PIDPAT: ts.NewSectionAssembler(), ts.PIDSDT: ts.NewSectionAssembler(), ts.PIDNIT: ts.NewSectionAssembler(),

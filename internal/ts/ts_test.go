@@ -194,3 +194,44 @@ func TestVCTFieldOffsets(t *testing.T) {
 		t.Fatalf("got %+v", ch)
 	}
 }
+
+func TestATSCGuideTables(t *testing.T) {
+	sec := func(b []byte) *Section {
+		t.Helper()
+		s, err := ParseSection(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	mgt, err := ParseMGT(sec(BuildMGT([]MGTTable{{Type: 0x0000, PID: 0x1ffb}, {Type: 0x0100, PID: 0x1d00, Version: 3}, {Type: 0x0200, PID: 0x1e00}})))
+	if err != nil || len(mgt) != 3 || mgt[1].PID != 0x1d00 || mgt[1].Version != 3 || mgt[0].IsGuide() || !mgt[1].IsGuide() || !mgt[2].IsGuide() {
+		t.Fatalf("mgt %+v %v", mgt, err)
+	}
+	now := time.Date(2026, 9, 27, 19, 30, 0, 0, time.UTC)
+	if off, err := ParseSTT(sec(BuildSTT(now, 18))); err != nil || off != 18 {
+		t.Fatalf("stt %d %v", off, err)
+	}
+	if got := GPSTime(GPSSeconds(now, 18), 18); !got.Equal(now) {
+		t.Fatalf("gps round trip %v", got)
+	}
+	// 2026-09-27 19:30 UTC is 1,474,572,618 GPS seconds (18 leap seconds).
+	if s := GPSSeconds(now, 18); s != 1474572618 {
+		t.Fatalf("gps seconds %d", s)
+	}
+	evs := []ATSCEvent{{EventID: 7, Start: GPSSeconds(now, 18), Duration: 30 * time.Minute, Title: "News at 3"},
+		{EventID: 8, Start: GPSSeconds(now.Add(30*time.Minute), 18), Duration: 90 * time.Minute, Title: "Movie"}}
+	eit, err := ParseATSCEIT(sec(BuildATSCEIT(1003, 1, evs)))
+	if err != nil || eit.SourceID != 1003 || len(eit.Events) != 2 || eit.Events[1] != evs[1] || eit.Events[0] != evs[0] {
+		t.Fatalf("eit %+v %v", eit, err)
+	}
+	ett, err := ParseETT(sec(BuildETT(1003, 8, 0, "A film.")))
+	if err != nil || ett.SourceID != 1003 || ett.EventID != 8 || ett.Text != "A film." {
+		t.Fatalf("ett %+v %v", ett, err)
+	}
+	// Two languages, the English one second; UTF-16 mode.
+	b := []byte{2, 's', 'p', 'a', 1, 0, 0, 4, 'H', 'o', 'l', 'a', 'e', 'n', 'g', 1, 0, 0x3f, 4, 0, 'H', 0, 'i'}
+	if got := DecodeMSS(b); got != "Hi" {
+		t.Fatalf("mss %q", got)
+	}
+}
