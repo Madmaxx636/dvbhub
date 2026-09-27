@@ -55,7 +55,7 @@ func (s *Server) apiSignal(w http.ResponseWriter, r *http.Request) {
 		Kbps        float64  `json:"kbps"`
 		Quality     string   `json:"quality"`
 	}
-	var out []sig
+	out := []sig{}
 	for _, t := range s.tm.Status(false) {
 		out = append(out, sig{Tuner: t.Key, State: t.State, Mux: t.Mux, Locked: t.Signal.Locked,
 			StrengthPct: t.Signal.StrengthPct, StrengthDBm: t.Signal.StrengthDBm, SNRdB: t.Signal.SNRdB,
@@ -154,7 +154,7 @@ func (s *Server) apiNetworks(w http.ResponseWriter, r *http.Request) {
 		Muxes    int `json:"muxes"`
 		Services int `json:"services"`
 	}
-	var out []netOut
+	out := []netOut{}
 	s.st.View(func(st *store.State) {
 		for _, n := range st.Networks {
 			no := netOut{Network: *n}
@@ -310,7 +310,7 @@ type muxOut struct {
 
 func (s *Server) apiMuxes(w http.ResponseWriter, r *http.Request) {
 	netID := r.URL.Query().Get("network")
-	var out []muxOut
+	out := []muxOut{}
 	s.st.View(func(st *store.State) {
 		for _, m := range st.Muxes {
 			if netID != "" && m.NetworkID != netID {
@@ -414,7 +414,7 @@ func (s *Server) apiServices(w http.ResponseWriter, r *http.Request) {
 		Mapped  []string `json:"mappedTo"`
 	}
 	muxID := r.URL.Query().Get("mux")
-	var out []svcOut
+	out := []svcOut{}
 	s.st.View(func(st *store.State) {
 		mapped := map[string][]string{}
 		for _, c := range st.Channels {
@@ -491,7 +491,7 @@ func (s *Server) apiChannels(w http.ResponseWriter, r *http.Request) {
 	}
 	base := s.baseURL(r)
 	now := time.Now()
-	var out []chOut
+	out := []chOut{}
 	for _, c := range s.channelsSorted(true) {
 		co := chOut{Channel: *c, StreamURL: base + "/stream/channel/" + c.ID}
 		s.st.View(func(st *store.State) {
@@ -543,8 +543,8 @@ func (s *Server) apiPutChannel(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		for _, o := range st.Channels {
-			if o.ID != c.ID && o.Number == c.Number && o.Enabled && c.Enabled {
-				return fmt.Errorf("number %d is already used by %s", c.Number, o.Name)
+			if o.ID != c.ID && o.Number == c.Number && o.Minor == c.Minor && o.Enabled && c.Enabled {
+				return fmt.Errorf("number %s is already used by %s", epg.GuideNumber(&c), o.Name)
 			}
 		}
 		st.Channels[c.ID] = &c
@@ -574,7 +574,7 @@ func (s *Server) apiProfiles(w http.ResponseWriter, r *http.Request) {
 		Passthrough bool   `json:"passthrough"`
 	}
 	var ffmpeg string
-	var out []profOut
+	out := []profOut{}
 	s.st.View(func(st *store.State) {
 		ffmpeg = st.Settings.FFmpeg
 		for _, p := range st.Profiles {
@@ -719,18 +719,19 @@ func (s *Server) apiEPGGrid(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		ID     string      `json:"id"`
 		Number int         `json:"number"`
+		Minor  int         `json:"minor,omitempty"`
 		Name   string      `json:"name"`
 		Icon   string      `json:"icon,omitempty"`
 		Source string      `json:"source"`
 		Events []epg.Event `json:"events"`
 	}
-	var out []row
+	out := []row{}
 	for _, c := range s.channelsSorted(false) {
 		src := "eit"
 		if c.EPGID != "" {
 			src = "xmltv:" + c.EPGID
 		}
-		out = append(out, row{ID: c.ID, Number: c.Number, Name: c.Name, Icon: c.Icon, Source: src, Events: s.guide.Range(c.ID, from, to)})
+		out = append(out, row{ID: c.ID, Number: c.Number, Minor: c.Minor, Name: c.Name, Icon: c.Icon, Source: src, Events: s.guide.Range(c.ID, from, to)})
 	}
 	writeJSON(w, map[string]any{"from": from, "to": to, "channels": out})
 }
@@ -753,7 +754,7 @@ func (s *Server) apiAutoMap(w http.ResponseWriter, r *http.Request) {
 var scanDirs = []string{"/usr/share/dvb", "/usr/share/dvbv5", "/usr/local/share/dvb"}
 
 func (s *Server) apiScanFiles(w http.ResponseWriter, r *http.Request) {
-	var out []string
+	out := []string{}
 	for _, d := range scanDirs {
 		filepath.WalkDir(d, func(p string, e os.DirEntry, err error) error {
 			if err == nil && !e.IsDir() {

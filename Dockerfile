@@ -16,7 +16,7 @@ FROM debian:bookworm-slim
 # If the CUDA filters (scale_cuda/yadif_cuda) are missing, dvbhub falls back
 # to CPU deinterlace/scale automatically and still encodes with NVENC.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
+ && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl dtv-scan-tables \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /dvbhub /usr/local/bin/dvbhub
 

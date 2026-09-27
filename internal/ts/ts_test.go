@@ -148,3 +148,49 @@ func TestAligner(t *testing.T) {
 		t.Fatalf("aligned %d bytes", len(out))
 	}
 }
+
+func TestVCTRoundTrip(t *testing.T) {
+	in := []VCTChannel{
+		{ShortName: "WSAV-HD", Major: 3, Minor: 1, TSID: 0x0123, Program: 3, ServiceType: 0x02},
+		{ShortName: "Court", Major: 3, Minor: 4, TSID: 0x0123, Program: 4, ServiceType: 0x02, AccessControlled: true},
+		{ShortName: "", Major: 1000, Minor: 999, TSID: 0x0123, Program: 5, ServiceType: 0x04, Hidden: true},
+	}
+	sec, err := ParseSection(BuildVCT(0x0123, 1, in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := ParseVCT(sec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.TSID != 0x0123 || len(v.Channels) != len(in) {
+		t.Fatalf("got %+v", v)
+	}
+	for i := range in {
+		if v.Channels[i] != in[i] {
+			t.Errorf("channel %d: got %+v want %+v", i, v.Channels[i], in[i])
+		}
+	}
+}
+
+// Hand-built TVCT bytes for "KSMO" 62.1, program 3, laid out per the A/65
+// field offsets, independent of BuildVCT.
+func TestVCTFieldOffsets(t *testing.T) {
+	c := make([]byte, 32)
+	copy(c, []byte{0, 'K', 0, 'S', 0, 'M', 0, 'O', 0, 0, 0, 0, 0, 0})
+	c[14], c[15], c[16] = 0xf0, 62<<2, 1 // major 62, minor 1
+	c[24], c[25] = 0x00, 0x03
+	c[26], c[27] = 0x0d, 0xc2
+	c[30], c[31] = 0xfc, 0x00
+	data := append([]byte{0, 1}, c...)
+	data = append(data, 0xfc, 0x00)
+	sec, _ := ParseSection(BuildSection(0xc8, 7, 0, 0, 0, data))
+	v, err := ParseVCT(sec)
+	if err != nil || len(v.Channels) != 1 {
+		t.Fatal(err)
+	}
+	ch := v.Channels[0]
+	if ch.ShortName != "KSMO" || ch.Major != 62 || ch.Minor != 1 || ch.Program != 3 || ch.ServiceType != 2 {
+		t.Fatalf("got %+v", ch)
+	}
+}

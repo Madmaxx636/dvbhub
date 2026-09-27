@@ -217,11 +217,11 @@ routes.tuners = async () => {
     const en = input({ type: 'checkbox', checked: c.enabled });
     const prio = input({ type: 'number', value: c.priority, style: 'width:80px' });
     const to = input({ type: 'number', value: c.tuneTimeout || 5, style: 'width:80px' });
-    const netBoxes = nets.filter(n => (n.type === 'virtual') === t.virtual).map(n => {
+    const netBoxes = (nets || []).filter(n => (n.type === 'virtual') === t.virtual).map(n => {
       const cb = input({ type: 'checkbox', checked: (c.networks || []).includes(n.id), 'data-id': n.id });
       return h('label', { class: 'row small' }, cb, n.name);
     });
-    const satNets = nets.filter(n => n.type === 'dvbs' && !t.virtual);
+    const satNets = (nets || []).filter(n => n.type === 'dvbs' && !t.virtual);
     const sat = satNets.map(n => {
       const cur = (c.sat || {})[n.id] || { lnb: 'universal', lofLow: 9750000, lofHigh: 10600000, switch: 11700000, diseqcPort: 0 };
       const lnb = select([['universal', 'Universal (9750/10600)'], ['single', 'Single LOF'], ['circular', 'Circular (10750)'], ['none', 'None (IF = frequency)']], cur.lnb);
@@ -339,7 +339,7 @@ routes.services = async () => {
         h('td', {}, input({ type: 'checkbox', checked: selected.has(sv.id), onchange: e => e.target.checked ? selected.add(sv.id) : selected.delete(sv.id) })),
         h('td', {}, h('b', {}, sv.name), h('div', { class: 'small muted' }, sv.provider)),
         h('td', {}, h('span', { class: 'badge' }, sv.kind), sv.scrambled ? h('span', { class: 'badge b-warn', style: 'margin-left:4px' }, 'scrambled') : null),
-        h('td', {}, sv.lcn || ''),
+        h('td', {}, sv.lcn ? (sv.minor ? `${sv.lcn}.${sv.minor}` : sv.lcn) : ''),
         h('td', { class: 'small' }, sv.mux, h('div', { class: 'muted' }, sv.network)),
         h('td', { class: 'small mono' }, (sv.streams || []).filter(x => x.kind).map(x => x.kind + (x.lang ? '/' + x.lang : '')).join(' ')),
         h('td', { class: 'small' }, (sv.mappedTo || []).join(', ') || h('span', { class: 'muted' }, '—')),
@@ -369,7 +369,7 @@ routes.channels = async () => {
     h('button', { onclick: () => act(() => api('POST', '/api/epg/automap'), r => `Matched ${r.mapped} channels to XMLTV`).then(route) }, 'Auto-match XMLTV guide')));
   const tbody = h('tbody');
   for (const c of chans || []) {
-    const num = input({ type: 'number', value: c.number, style: 'width:70px' });
+    const num = input({ value: c.minor ? `${c.number}.${c.minor}` : c.number, inputmode: 'decimal', style: 'width:70px' });
     const name = input({ value: c.name, style: 'width:180px' });
     const en = input({ type: 'checkbox', checked: c.enabled });
     const epgId = input({ value: c.epgId || '', list: 'xmltv-ids', placeholder: 'OTA (EIT)', style: 'width:150px' });
@@ -384,7 +384,7 @@ routes.channels = async () => {
       h('select', { class: 'small', onchange: e => { if (e.target.value) { services.push(e.target.value); renderSvcs(); } } },
         h('option', { value: '' }, '+ add backup service…'), (svcs || []).filter(x => !services.includes(x.id)).map(x => h('option', { value: x.id }, `${x.name} @ ${x.mux}`))));
     renderSvcs();
-    const save = () => act(() => api('PUT', '/api/channels/' + c.id, { ...c, number: +num.value, name: name.value, enabled: en.checked, epgId: epgId.value.trim(), profile: prof.value, icon: icon.value.trim(), services }), 'Saved');
+    const save = () => act(() => api('PUT', '/api/channels/' + c.id, { ...c, number: +num.value.split('.')[0], minor: +(num.value.split('.')[1] || 0), name: name.value, enabled: en.checked, epgId: epgId.value.trim(), profile: prof.value, icon: icon.value.trim(), services }), 'Saved');
     tbody.append(h('tr', {},
       h('td', {}, num), h('td', {}, name, c.now ? h('div', { class: 'small muted' }, 'Now: ', c.now.title) : null), h('td', {}, en),
       h('td', {}, svcList), h('td', {}, epgId), h('td', {}, prof), h('td', {}, icon),
@@ -421,7 +421,7 @@ routes.guide = async () => {
       track.append(h('div', { class: 'g-ev' + (isNow ? ' now' : ''), style: `left:${l}px;width:${r - l - 2}px`, title: `${e.title}\n${fmtTime(e.start)}–${fmtTime(e.stop)}\n${e.subtitle || ''}\n${e.description || ''}` },
         h('b', {}, e.title), h('span', { class: 'muted' }, `${fmtTime(e.start)} ${e.episodeText || e.subtitle || ''}`)));
     }
-    g.append(h('div', { class: 'g-row' }, h('div', { class: 'g-ch' }, h('b', {}, c.number, ' '), c.name, h('div', { class: 'small muted' }, c.source)), track));
+    g.append(h('div', { class: 'g-row' }, h('div', { class: 'g-ch' }, h('b', {}, c.minor ? `${c.number}.${c.minor}` : c.number, ' '), c.name, h('div', { class: 'small muted' }, c.source)), track));
   }
   if (!data.channels?.length) g.append(h('div', { class: 'empty' }, 'No channels.'));
   $view.append(g);

@@ -126,6 +126,7 @@ type result struct {
 	pmts map[uint16]*ts.PMT
 	sdt  *ts.SDT
 	nit  *ts.NIT
+	vct  []ts.VCTChannel
 }
 
 func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error) {
@@ -139,12 +140,16 @@ func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error
 	res := &result{pmts: map[uint16]*ts.PMT{}}
 	asm := map[uint16]*ts.SectionAssembler{
 		ts.PIDPAT: ts.NewSectionAssembler(), ts.PIDSDT: ts.NewSectionAssembler(), ts.PIDNIT: ts.NewSectionAssembler(),
+		ts.PIDPSIP: ts.NewSectionAssembler(),
 	}
 	pmtPID := map[uint16]bool{}
 	sdtParts := map[byte]*ts.SDT{}
 	var sdtLast byte
 	nitParts := map[byte]*ts.NIT{}
 	var nitLast byte
+	vctParts := map[byte]*ts.VCT{}
+	var vctLast byte
+	vctDone := func() bool { return len(vctParts) > 0 && len(vctParts) > int(vctLast) }
 	start := time.Now()
 	var firstData time.Time
 	deadline := time.NewTimer(timeout)
@@ -159,10 +164,11 @@ func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error
 				return false
 			}
 		}
-		if len(sdtParts) <= int(sdtLast) {
+		// DVB muxes carry an SDT; ATSC muxes carry a VCT (and no NIT) instead.
+		if len(sdtParts) <= int(sdtLast) && !vctDone() {
 			return false
 		}
-		return len(nitParts) > int(nitLast) || time.Since(firstData) > 12*time.Second
+		return len(nitParts) > int(nitLast) || vctDone() || time.Since(firstData) > 12*time.Second
 	}
 
 	for {
@@ -176,7 +182,7 @@ func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error
 			if res.pat == nil {
 				return nil, errors.New("no PAT received")
 			}
-			return s.merge(res, sdtParts, nitParts), nil
+			return s.merge(res, sdtParts, nitParts, vctParts), nil
 		case pkts := <-sub.C:
 			if firstData.IsZero() {
 				firstData = time.Now()
@@ -220,6 +226,11 @@ func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error
 							sdtParts[ps.Number] = sdt
 							sdtLast = ps.Last
 						}
+					case pid == ts.PIDPSIP && ts.IsVCT(ps.TableID):
+						if vct, err := ts.ParseVCT(ps); err == nil {
+							vctParts[ps.Number] = vct
+							vctLast = ps.Last
+						}
 					case ps.TableID == 0x40:
 						if nit, err := ts.ParseNIT(ps); err == nil {
 							nitParts[ps.Number] = nit
@@ -230,13 +241,16 @@ func (s *Scanner) scanMux(muxID string, sub *tuner.Subscription) (*result, error
 			})
 			if complete() {
 				log.Printf("scan: mux %s complete in %s", muxID, time.Since(start).Round(time.Millisecond))
-				return s.merge(res, sdtParts, nitParts), nil
+				return s.merge(res, sdtParts, nitParts, vctParts), nil
 			}
 		}
 	}
 }
 
-func (s *Scanner) merge(res *result, sdtParts map[byte]*ts.SDT, nitParts map[byte]*ts.NIT) *result {
+func (s *Scanner) merge(res *result, sdtParts map[byte]*ts.SDT, nitParts map[byte]*ts.NIT, vctParts map[byte]*ts.VCT) *result {
+	for _, p := range vctParts {
+		res.vct = append(res.vct, p.Channels...)
+	}
 	for _, p := range sdtParts {
 		if res.sdt == nil {
 			c := *p
@@ -279,6 +293,12 @@ func (s *Scanner) finish(muxID string, res *result, scanErr error) {
 			mux.ONID = res.sdt.ONID
 			for _, sv := range res.sdt.Services {
 				sdtBySID[sv.SID] = sv
+			}
+		}
+		vctByProg := map[uint16]ts.VCTChannel{}
+		for _, vc := range res.vct {
+			if vc.TSID == mux.TSID || vc.TSID == 0 {
+				vctByProg[vc.Program] = vc
 			}
 		}
 		net := state.Networks[mux.NetworkID]
@@ -327,7 +347,25 @@ func (s *Scanner) finish(muxID string, res *result, scanErr error) {
 					svc.Scrambled = true
 				}
 			}
-			if svc.Kind == "" || svc.Kind == "other" {
+			vc, inVCT := vctByProg[prog]
+			if inVCT {
+				if vc.ShortName != "" {
+					svc.Name = vc.ShortName
+				}
+				svc.LCN, svc.Minor = vc.Major, vc.Minor
+				switch {
+				case vc.Hidden || vc.ServiceType == 0x04:
+					svc.Kind = "other"
+				case vc.ServiceType == 0x03:
+					svc.Kind = "radio"
+				case vc.ServiceType == 0x02:
+					svc.Kind = "tv"
+				}
+				if vc.AccessControlled {
+					svc.Scrambled = true
+				}
+			}
+			if svc.Kind == "" || (svc.Kind == "other" && !(inVCT && (vc.Hidden || vc.ServiceType == 0x04))) {
 				switch {
 				case hasVideo:
 					svc.Kind = "tv"
@@ -431,14 +469,15 @@ type MapOptions struct {
 func MapServices(st *store.Store, opt MapOptions) (created, merged int) {
 	st.Update(func(state *store.State) error {
 		mapped := map[string]bool{}
-		used := map[int]bool{}
+		type num struct{ major, minor int }
+		used := map[num]bool{}
 		byName := map[string]*store.Channel{}
 		maxNum := 0
 		for _, c := range state.Channels {
 			for _, s := range c.Services {
 				mapped[s] = true
 			}
-			used[c.Number] = true
+			used[num{c.Number, c.Minor}] = true
 			maxNum = max(maxNum, c.Number)
 			byName[strings.ToLower(c.Name)] = c
 		}
@@ -462,6 +501,9 @@ func MapServices(st *store.Store, opt MapOptions) (created, merged int) {
 			if a.LCN != b.LCN {
 				return a.LCN < b.LCN
 			}
+			if a.Minor != b.Minor {
+				return a.Minor < b.Minor
+			}
 			return a.Name < b.Name
 		})
 		for _, s := range svcs {
@@ -475,13 +517,13 @@ func MapServices(st *store.Store, opt MapOptions) (created, merged int) {
 				merged++
 				continue
 			}
-			num := s.LCN
-			if num <= 0 || used[num] {
-				num = maxNum + 1
+			n := num{s.LCN, s.Minor}
+			if n.major <= 0 || used[n] {
+				n = num{maxNum + 1, 0}
 			}
-			used[num] = true
-			maxNum = max(maxNum, num)
-			c := &store.Channel{ID: store.NewID(), Number: num, Name: s.Name, Enabled: true,
+			used[n] = true
+			maxNum = max(maxNum, n.major)
+			c := &store.Channel{ID: store.NewID(), Number: n.major, Minor: n.minor, Name: s.Name, Enabled: true,
 				Services: []string{s.ID}, Radio: s.Kind == "radio"}
 			state.Channels[c.ID] = c
 			byName[strings.ToLower(c.Name)] = c

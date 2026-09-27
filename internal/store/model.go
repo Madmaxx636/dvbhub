@@ -59,8 +59,9 @@ type Service struct {
 	Name      string    `json:"name"`
 	Provider  string    `json:"provider"`
 	Type      byte      `json:"type"`
-	Kind      string    `json:"kind"` // tv, radio, other
-	LCN       int       `json:"lcn,omitempty"`
+	Kind      string    `json:"kind"`            // tv, radio, other
+	LCN       int       `json:"lcn,omitempty"`   // DVB LCN, or ATSC major channel
+	Minor     int       `json:"minor,omitempty"` // ATSC minor channel (the 1 in 3.1)
 	PMTPID    uint16    `json:"pmtPid"`
 	PCRPID    uint16    `json:"pcrPid"`
 	Streams   []Stream  `json:"streams"`
@@ -72,6 +73,7 @@ type Service struct {
 type Channel struct {
 	ID       string   `json:"id"`
 	Number   int      `json:"number"`
+	Minor    int      `json:"minor,omitempty"` // ATSC sub-channel: Number.Minor
 	Name     string   `json:"name"`
 	Enabled  bool     `json:"enabled"`
 	Services []string `json:"services"` // in failover order

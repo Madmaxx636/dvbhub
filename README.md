@@ -2,7 +2,7 @@
 
 A DVB tuner server that replaces Tvheadend for a Jellyfin (or Plex) setup: a single Go binary with no dependencies beyond ffmpeg.
 
-- **Tuners:** DVB-T/T2, DVB-C and DVB-S/S2 through the Linux DVB API v5, with universal LNB and DiSEqC 1.0 support. Scan tables use the dtv-scan-tables (dvbv5) or legacy format, and new muxes are discovered from the NIT.
+- **Tuners:** DVB-T/T2, DVB-C, DVB-S/S2 and ATSC through the Linux DVB API v5, with universal LNB and DiSEqC 1.0 support. Scan tables use the dtv-scan-tables (dvbv5) or legacy format, and new muxes are discovered from the NIT.
 - **Channels:** services come from PAT/PMT/SDT, and logical channel numbers from the NIT. A channel can list backup services on other muxes or tuners, and mapping services with the same name onto one channel creates those backups automatically.
 - **Signal-loss handling:** clients are never disconnected because of a signal drop. They receive PAT and null packets while the tuner is re-tuned, and a channel moves to its backup service on another tuner after 8 s.
 - **Signal monitoring:** each tuner shows strength (% and dBm), SNR in dB, BER, uncorrected blocks, continuity errors, bitrate, a one-word verdict and a 5-minute history. `GET /api/signal` returns the same data as compact JSON for scripts.
@@ -25,7 +25,7 @@ go build -o dvbhub ./cmd/dvbhub
 
 Open `http://<server>:9980/`, then:
 
-1. **Networks:** add a network (DVB-T/C/S). Import a scan table, or add a mux by hand; scanning starts automatically.
+1. **Networks:** add a network (DVB-T/C/S or ATSC). Import a scan table, or add a mux by hand; scanning starts automatically. For US over-the-air, pick ATSC and import `us-ATSC-center-frequencies-8VSB`; channel names and numbers (3.1, 3.2…) come from the station's PSIP virtual channel table.
 2. **Services:** click **Map all**. With "Same name → failover" ticked, identical channels on different muxes become backups.
 3. **Settings:** add XMLTV sources if you want them. Channels without an XMLTV id use the over-the-air EPG.
 
@@ -66,4 +66,4 @@ To update: `docker compose pull && docker compose up -d`. Tagging a release (`gi
 
 ## Not verified yet
 
-The hardware code paths (`internal/dvb`) and NVENC have not been run against real hardware. The ioctl numbers and struct layouts were checked against the kernel headers, but real tuning, DiSEqC and signal statistics still need testing on the actual server. ATSC tuning is wired up, but channel names come from DVB SDT only, so ATSC PSIP names are not read.
+The hardware code paths (`internal/dvb`) and NVENC have not been run against real hardware. The ioctl numbers and struct layouts were checked against the kernel headers, but real tuning, DiSEqC and signal statistics still need testing on the actual server. ATSC channel names and numbers are read from the PSIP VCT; the ATSC program guide (PSIP EIT) is not read yet, so use an XMLTV source for guide data.

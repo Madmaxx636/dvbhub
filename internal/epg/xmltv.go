@@ -374,7 +374,12 @@ func (im *Importer) AutoMap() int {
 // ---- export ----
 
 // GuideNumber is the channel id used in exported lineups and XMLTV.
-func GuideNumber(c *store.Channel) string { return strconv.Itoa(c.Number) }
+func GuideNumber(c *store.Channel) string {
+	if c.Minor > 0 {
+		return strconv.Itoa(c.Number) + "." + strconv.Itoa(c.Minor)
+	}
+	return strconv.Itoa(c.Number)
+}
 
 func xmlEsc(s string) string {
 	var b strings.Builder
@@ -392,7 +397,7 @@ func (g *Guide) WriteXMLTV(w io.Writer, chans []*store.Channel, iconURL func(*st
 		if u := iconURL(c); u != "" {
 			fmt.Fprintf(bw, "    <icon src=\"%s\"/>\n", xmlEsc(u))
 		}
-		fmt.Fprintf(bw, "    <lcn>%d</lcn>\n  </channel>\n", c.Number)
+		fmt.Fprintf(bw, "    <lcn>%s</lcn>\n  </channel>\n", xmlEsc(GuideNumber(c)))
 	}
 	now := time.Now().Add(-6 * time.Hour)
 	for _, c := range chans {
