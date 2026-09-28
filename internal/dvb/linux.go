@@ -182,7 +182,7 @@ func Discover() []FrontendInfo {
 		go func(info FrontendInfo) { done <- probeFrontend(p, info) }(info)
 		select {
 		case info = <-done:
-		case <-time.After(3 * time.Second):
+		case <-time.After(20 * time.Second): // generous: some tuners load firmware on first open (Si2157: ~3.5 s)
 			info.Name = "not responding (driver busy or firmware missing)"
 		}
 		out = append(out, info)

@@ -119,7 +119,11 @@ func (m *Manager) Reload() {
 			if c, ok := st.Tuners[s.Key()]; ok {
 				t.cfg = *c
 			} else {
-				t.cfg = store.TunerConfig{Key: s.Key(), Name: s.Name(), Enabled: true, TuneTimeout: 5}
+				tt := 15 // hardware: allow for firmware loading on first open
+				if s.Virtual() {
+					tt = 5
+				}
+				t.cfg = store.TunerConfig{Key: s.Key(), Name: s.Name(), Enabled: true, TuneTimeout: tt}
 				missing = append(missing, t.cfg)
 			}
 			tuners = append(tuners, t)

@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,6 +58,13 @@ func (s *Store) defaults() {
 	}
 	if st.Tuners == nil {
 		st.Tuners = map[string]*TunerConfig{}
+	}
+	// 5 s (the old default) is too short for tuners that load firmware when
+	// opened (e.g. Hauppauge dualHD / Si2157 takes ~3.5 s before it can lock).
+	for _, t := range st.Tuners {
+		if t.TuneTimeout > 0 && t.TuneTimeout <= 5 && !strings.HasPrefix(t.Key, "virtual") {
+			t.TuneTimeout = 15
+		}
 	}
 	if st.Profiles == nil {
 		st.Profiles = DefaultProfiles()

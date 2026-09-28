@@ -227,7 +227,7 @@ func (s *session) run() {
 	}
 	timeout := time.Duration(s.tuner.cfg.TuneTimeout) * time.Second
 	if timeout <= 0 {
-		timeout = 5 * time.Second
+		timeout = 15 * time.Second
 	}
 	buf := make([]byte, ts.PacketSize*348)
 	var al ts.Aligner
@@ -241,7 +241,7 @@ func (s *session) run() {
 		s.mu.Unlock()
 		if stream == nil {
 			s.setState("tuning", nil)
-			st, err := s.tuner.src.Open(s.ctx, s.mux, s.satInput(), timeout)
+			st, err := s.open(timeout)
 			if s.ctx.Err() != nil {
 				if st != nil {
 					st.Close()
@@ -295,6 +295,31 @@ func (s *session) run() {
 				s.mu.Unlock()
 				lastData = time.Now()
 			}
+		}
+	}
+}
+
+// open tunes the tuner, sending keep-alives every 500 ms while it works so
+// viewers stay connected (and failover can trigger) during slow tunes, such
+// as tuners that load firmware when opened.
+func (s *session) open(timeout time.Duration) (Stream, error) {
+	type result struct {
+		st  Stream
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		st, err := s.tuner.src.Open(s.ctx, s.mux, s.satInput(), timeout)
+		ch <- result{st, err}
+	}()
+	tick := time.NewTicker(500 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case r := <-ch:
+			return r.st, r.err
+		case <-tick.C:
+			s.keepalive()
 		}
 	}
 }
