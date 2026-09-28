@@ -176,29 +176,41 @@ func Discover() []FrontendInfo {
 			continue
 		}
 		info := FrontendInfo{Key: fmt.Sprintf("adapter%d/frontend%d", a, fe), Adapter: a, Frontend: fe}
-		f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NONBLOCK, 0)
-		if err != nil {
-			info.Name = "unavailable: " + err.Error()
-			out = append(out, info)
-			continue
+		// Some drivers block in open/ioctl (e.g. while loading firmware); never
+		// let one tuner stall startup.
+		done := make(chan FrontendInfo, 1)
+		go func(info FrontendInfo) { done <- probeFrontend(p, info) }(info)
+		select {
+		case info = <-done:
+		case <-time.After(3 * time.Second):
+			info.Name = "not responding (driver busy or firmware missing)"
 		}
-		var raw [168]byte
-		if ioctl(f, feGetInfo, uintptr(unsafe.Pointer(&raw[0]))) == nil {
-			info.Name = strings.TrimRight(string(raw[:128]), "\x00")
-		}
-		pl := newPropList(1)
-		pl.add(dtvEnumDelsys, 0)
-		if pl.call(f, feGetProperty) == nil {
-			b := pl.prop(0)
-			n := int(binary.NativeEndian.Uint32(b[propUnion+32:]))
-			for i := 0; i < n && i < 32; i++ {
-				info.DelSys = append(info.DelSys, delsysName(uint32(b[propUnion+i])))
-			}
-		}
-		f.Close()
 		out = append(out, info)
 	}
 	return out
+}
+
+func probeFrontend(path string, info FrontendInfo) FrontendInfo {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		info.Name = "unavailable: " + err.Error()
+		return info
+	}
+	defer f.Close()
+	var raw [168]byte
+	if ioctl(f, feGetInfo, uintptr(unsafe.Pointer(&raw[0]))) == nil {
+		info.Name = strings.TrimRight(string(raw[:128]), "\x00")
+	}
+	pl := newPropList(1)
+	pl.add(dtvEnumDelsys, 0)
+	if pl.call(f, feGetProperty) == nil {
+		b := pl.prop(0)
+		n := int(binary.NativeEndian.Uint32(b[propUnion+32:]))
+		for i := 0; i < n && i < 32; i++ {
+			info.DelSys = append(info.DelSys, delsysName(uint32(b[propUnion+i])))
+		}
+	}
+	return info
 }
 
 // Signal is a snapshot of frontend reception quality.

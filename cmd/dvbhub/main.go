@@ -42,6 +42,7 @@ func main() {
 		return
 	}
 
+	log.Printf("dvbhub starting (data in %s)", *dataDir)
 	st, err := store.Open(*dataDir)
 	if err != nil {
 		log.Fatal(err)
@@ -49,7 +50,9 @@ func main() {
 	if *virtual >= 0 {
 		st.Update(func(s *store.State) error { s.Settings.VirtualTuners = *virtual; return nil })
 	}
+	log.Printf("startup: looking for tuners")
 	tm := tuner.NewManager(st)
+	log.Printf("startup: %d tuner(s) ready; loading scanner and guide", tm.TunerCount())
 	sc := scan.New(st, tm)
 	guide := epg.Open(*dataDir)
 	im := epg.NewImporter(st, guide)
