@@ -110,7 +110,7 @@ func (h *hwSource) Open(ctx context.Context, mux store.Mux, sat *store.SatInput,
 			fe.Close()
 		}
 	}
-	if err := fe.Tune(mux.Tuning, sat, timeout); err != nil {
+	if err := fe.Tune(ctx, mux.Tuning, sat, timeout); err != nil {
 		release()
 		return nil, err
 	}

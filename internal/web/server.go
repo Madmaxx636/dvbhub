@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -136,6 +137,10 @@ func (s *Server) routes() {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	// A nil slice would encode as null, which the UI cannot .filter/.map.
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Slice && rv.IsNil() {
+		v = []any{}
+	}
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(v); err != nil {
 		log.Printf("web: encode: %v", err)
@@ -175,7 +180,7 @@ func (s *Server) baseURL(r *http.Request) string {
 
 // channelsSorted returns enabled channels ordered by number.
 func (s *Server) channelsSorted(includeDisabled bool) []*store.Channel {
-	var out []*store.Channel
+	out := []*store.Channel{}
 	s.st.View(func(st *store.State) {
 		for _, c := range st.Channels {
 			if c.Enabled || includeDisabled {
@@ -187,6 +192,9 @@ func (s *Server) channelsSorted(includeDisabled bool) []*store.Channel {
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Number != out[j].Number {
 			return out[i].Number < out[j].Number
+		}
+		if out[i].Minor != out[j].Minor {
+			return out[i].Minor < out[j].Minor
 		}
 		return out[i].Name < out[j].Name
 	})

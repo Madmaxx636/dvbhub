@@ -148,3 +148,90 @@ func TestAligner(t *testing.T) {
 		t.Fatalf("aligned %d bytes", len(out))
 	}
 }
+
+func TestVCTRoundTrip(t *testing.T) {
+	in := []VCTChannel{
+		{ShortName: "WSAV-HD", Major: 3, Minor: 1, TSID: 0x0123, Program: 3, ServiceType: 0x02},
+		{ShortName: "Court", Major: 3, Minor: 4, TSID: 0x0123, Program: 4, ServiceType: 0x02, AccessControlled: true},
+		{ShortName: "", Major: 1000, Minor: 999, TSID: 0x0123, Program: 5, ServiceType: 0x04, Hidden: true},
+	}
+	sec, err := ParseSection(BuildVCT(0x0123, 1, in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := ParseVCT(sec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.TSID != 0x0123 || len(v.Channels) != len(in) {
+		t.Fatalf("got %+v", v)
+	}
+	for i := range in {
+		if v.Channels[i] != in[i] {
+			t.Errorf("channel %d: got %+v want %+v", i, v.Channels[i], in[i])
+		}
+	}
+}
+
+// Hand-built TVCT bytes for "KSMO" 62.1, program 3, laid out per the A/65
+// field offsets, independent of BuildVCT.
+func TestVCTFieldOffsets(t *testing.T) {
+	c := make([]byte, 32)
+	copy(c, []byte{0, 'K', 0, 'S', 0, 'M', 0, 'O', 0, 0, 0, 0, 0, 0})
+	c[14], c[15], c[16] = 0xf0, 62<<2, 1 // major 62, minor 1
+	c[24], c[25] = 0x00, 0x03
+	c[26], c[27] = 0x0d, 0xc2
+	c[30], c[31] = 0xfc, 0x00
+	data := append([]byte{0, 1}, c...)
+	data = append(data, 0xfc, 0x00)
+	sec, _ := ParseSection(BuildSection(0xc8, 7, 0, 0, 0, data))
+	v, err := ParseVCT(sec)
+	if err != nil || len(v.Channels) != 1 {
+		t.Fatal(err)
+	}
+	ch := v.Channels[0]
+	if ch.ShortName != "KSMO" || ch.Major != 62 || ch.Minor != 1 || ch.Program != 3 || ch.ServiceType != 2 {
+		t.Fatalf("got %+v", ch)
+	}
+}
+
+func TestATSCGuideTables(t *testing.T) {
+	sec := func(b []byte) *Section {
+		t.Helper()
+		s, err := ParseSection(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	mgt, err := ParseMGT(sec(BuildMGT([]MGTTable{{Type: 0x0000, PID: 0x1ffb}, {Type: 0x0100, PID: 0x1d00, Version: 3}, {Type: 0x0200, PID: 0x1e00}})))
+	if err != nil || len(mgt) != 3 || mgt[1].PID != 0x1d00 || mgt[1].Version != 3 || mgt[0].IsGuide() || !mgt[1].IsGuide() || !mgt[2].IsGuide() {
+		t.Fatalf("mgt %+v %v", mgt, err)
+	}
+	now := time.Date(2026, 9, 27, 19, 30, 0, 0, time.UTC)
+	if off, err := ParseSTT(sec(BuildSTT(now, 18))); err != nil || off != 18 {
+		t.Fatalf("stt %d %v", off, err)
+	}
+	if got := GPSTime(GPSSeconds(now, 18), 18); !got.Equal(now) {
+		t.Fatalf("gps round trip %v", got)
+	}
+	// 2026-09-27 19:30 UTC is 1,474,572,618 GPS seconds (18 leap seconds).
+	if s := GPSSeconds(now, 18); s != 1474572618 {
+		t.Fatalf("gps seconds %d", s)
+	}
+	evs := []ATSCEvent{{EventID: 7, Start: GPSSeconds(now, 18), Duration: 30 * time.Minute, Title: "News at 3"},
+		{EventID: 8, Start: GPSSeconds(now.Add(30*time.Minute), 18), Duration: 90 * time.Minute, Title: "Movie"}}
+	eit, err := ParseATSCEIT(sec(BuildATSCEIT(1003, 1, evs)))
+	if err != nil || eit.SourceID != 1003 || len(eit.Events) != 2 || eit.Events[1] != evs[1] || eit.Events[0] != evs[0] {
+		t.Fatalf("eit %+v %v", eit, err)
+	}
+	ett, err := ParseETT(sec(BuildETT(1003, 8, 0, "A film.")))
+	if err != nil || ett.SourceID != 1003 || ett.EventID != 8 || ett.Text != "A film." {
+		t.Fatalf("ett %+v %v", ett, err)
+	}
+	// Two languages, the English one second; UTF-16 mode.
+	b := []byte{2, 's', 'p', 'a', 1, 0, 0, 4, 'H', 'o', 'l', 'a', 'e', 'n', 'g', 1, 0, 0x3f, 4, 0, 'H', 0, 'i'}
+	if got := DecodeMSS(b); got != "Hi" {
+		t.Fatalf("mss %q", got)
+	}
+}

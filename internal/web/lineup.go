@@ -180,13 +180,8 @@ func (s *Server) xmltvExport(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) streamAuto(w http.ResponseWriter, r *http.Request) {
 	num := strings.TrimPrefix(r.PathValue("vnum"), "v")
-	n, err := strconv.Atoi(num)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
 	for _, c := range s.channelsSorted(false) {
-		if c.Number == n {
+		if epg.GuideNumber(c) == num {
 			prof, _ := s.lineupProfile(r)
 			s.serveChannel(w, r, c, prof)
 			return

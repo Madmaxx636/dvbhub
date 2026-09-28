@@ -26,6 +26,7 @@ const (
 	historyLen    = 300 // one sample per second
 	lingerTime    = 4 * time.Second
 	failoverAfter = 8 * time.Second
+	maxOutage     = 60 * time.Second // then the session ends and frees the tuner
 )
 
 var (
