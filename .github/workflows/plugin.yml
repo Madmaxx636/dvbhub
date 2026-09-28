@@ -16,6 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - jellyfin: "10.10"
@@ -40,7 +41,7 @@ jobs:
         working-directory: jellyfin-plugin
         run: |
           dotnet build -c Release \
-            -p:TargetFramework=${{ matrix.tfm }} \
+            -p:JellyfinTfm=${{ matrix.tfm }} \
             -p:JellyfinVersion=${{ matrix.jellyfin }}.* \
             -p:PluginVersion=${{ steps.v.outputs.version }} \
             -o out

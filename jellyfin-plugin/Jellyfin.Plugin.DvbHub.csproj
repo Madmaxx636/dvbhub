@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Build for Jellyfin 10.11 (net9.0) by default. For 10.10:
-       dotnet build -c Release -p:TargetFramework=net8.0 -p:JellyfinVersion=10.10.* -->
+       dotnet build -c Release -p:JellyfinTfm=net8.0 -p:JellyfinVersion=10.10.*
+       (TargetFramework itself can't be set from the command line: NuGet restore ignores it.) -->
   <PropertyGroup>
-    <TargetFramework Condition="'$(TargetFramework)' == ''">net9.0</TargetFramework>
+    <JellyfinTfm Condition="'$(JellyfinTfm)' == ''">net9.0</JellyfinTfm>
+    <TargetFramework>$(JellyfinTfm)</TargetFramework>
     <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">10.11.*</JellyfinVersion>
     <PluginVersion Condition="'$(PluginVersion)' == ''">1.0.0.0</PluginVersion>
     <RootNamespace>Jellyfin.Plugin.DvbHub</RootNamespace>
