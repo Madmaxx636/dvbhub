@@ -2,6 +2,7 @@
 # End-to-end test of dvbhub using virtual (file-backed) tuners.
 # Output is also written to build/e2e.log. Pass "keep" to leave the server running.
 cd "$(dirname "$0")/.."
+mkdir -p build
 exec > >(tee build/e2e.log) 2>&1
 set -u
 B=http://127.0.0.1:9980
@@ -149,6 +150,35 @@ BR=$(ffprobe -v error -show_entries format=bit_rate -of csv=p=0 $T/tx.ts)
 echo "  measured output bitrate: $BR bit/s (target 3000k video + 128k audio)"
 check "CBR bitrate within 25% of target" "[[ ${BR:-0} -gt 2350000 && ${BR:-0} -lt 3900000 ]]"
 curl -s -o /dev/null -w '  invalid profile -> HTTP %{http_code}\n' -X PUT $B/api/profiles/bad -d '{"videoCodec":"rm -rf","audioCodec":"aac"}'
+
+echo "== signal bars (scan / channels)"
+curl -sf "$B/api/muxes?network=$NET" | j '"\n".join(f"  mux {m.label}: bars={m.signal.bars} quality={m.signal.quality}" for m in d)'
+check "every scanned mux has signal bars" "[[ \$(curl -sf '$B/api/muxes?network=$NET' | j 'all(m.signal.bars > 0 for m in d)') == True ]]"
+check "services carry signal" "[[ \$(curl -sf $B/api/services | j 'all(s.signal.bars > 0 for s in d)') == True ]]"
+check "channels carry signal" "[[ \$(curl -sf $B/api/channels | j 'all(c.signal.bars > 0 for c in d)') == True ]]"
+
+echo "== alignment mode"
+M1=$(curl -sf "$B/api/muxes?network=$NET" | j 'd[0].id')
+check "align start on virtual1" "curl -sf -X POST $B/api/align -d '{\"tuner\":\"virtual1\",\"muxId\":\"$M1\"}' >/dev/null"
+sleep 2
+AL=$(curl -sf "$B/api/align?tuner=virtual1")
+echo "  $AL" | cut -c1-200
+check "align reports lock + bars" "[[ \$(echo '$AL' | j 'd.active and d.signal.locked and d.bars > 0') == True ]]"
+curl -sf -X DELETE "$B/api/align?tuner=virtual1" >/dev/null
+sleep 5
+check "align released the tuner" "[[ \$(curl -sf $B/api/status | j '[t.state for t in d.tuners if t.key==\"virtual1\"][0]') == idle ]]"
+
+echo "== hardware & installer bridge"
+check "hardware report" "curl -sf $B/api/hardware | j 'd.report.summary' | grep -q ."
+check "installer refuses when not enabled" "[[ \$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/hardware/install -d '{\"action\":\"firmware\"}') == 409 ]]"
+mkdir -p $T/data/driver && echo '{"host":"test","version":"1"}' > $T/data/driver/enabled
+check "installer rejects unknown action" "[[ \$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/hardware/install -d '{\"action\":\"rm -rf /\"}') == 409 ]]"
+JOB=$(curl -sf -X POST $B/api/hardware/install -d '{"action":"firmware"}' | j 'd.id')
+check "installer queues a request file" "[[ \$(cat $T/data/driver/requests/$JOB.req) == firmware ]]"
+check "job visible as queued" "[[ \$(curl -sf $B/api/hardware/jobs/$JOB | j 'd.status') == queued ]]"
+mkdir -p $T/data/driver/jobs && rm -f $T/data/driver/requests/$JOB.req && echo "firmware ok reboot" > $T/data/driver/jobs/$JOB.status && echo "Added 12 firmware file(s)." > $T/data/driver/jobs/$JOB.log
+check "job result + log readable" "[[ \$(curl -sf $B/api/hardware/jobs/$JOB | j 'd.status + str(d.rebootRecommended) + d.log.strip()') == 'okTrueAdded 12 firmware file(s).' ]]"
+rm -rf $T/data/driver
 
 echo "== admin UI & API"
 check "UI served" "curl -sf $B/ | grep -q dvbhub"

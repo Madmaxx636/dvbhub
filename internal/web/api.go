@@ -54,13 +54,14 @@ func (s *Server) apiSignal(w http.ResponseWriter, r *http.Request) {
 		CCErrors    uint64   `json:"ccErrors"`
 		Kbps        float64  `json:"kbps"`
 		Quality     string   `json:"quality"`
+		Bars        int      `json:"bars"`
 	}
 	var out []sig
 	for _, t := range s.tm.Status(false) {
 		out = append(out, sig{Tuner: t.Key, State: t.State, Mux: t.Mux, Locked: t.Signal.Locked,
 			StrengthPct: t.Signal.StrengthPct, StrengthDBm: t.Signal.StrengthDBm, SNRdB: t.Signal.SNRdB,
 			SNRPct: t.Signal.SNRPct, BER: t.Signal.BER, UNC: t.Signal.UNC, CCErrors: t.CCErrors, Kbps: t.Kbps,
-			Quality: Quality(t.State, t.Signal)})
+			Quality: Quality(t.State, t.Signal), Bars: t.Bars})
 	}
 	writeJSON(w, out)
 }
@@ -70,22 +71,21 @@ func Quality(state string, s dvb.Signal) string {
 	if state == "idle" {
 		return "idle"
 	}
-	if !s.Locked {
-		return "no-lock"
+	return s.Quality()
+}
+
+// muxSignal returns the live reading for a mux if it is tuned, else the stored one.
+func muxSignal(live map[string]dvb.Signal, st *store.State, muxID string) *store.SignalSnap {
+	if sig, ok := live[muxID]; ok {
+		snap := sig.Snapshot()
+		snap.Live = true
+		return &snap
 	}
-	snr := s.SNRPct
-	if s.SNRdB != nil {
-		snr = *s.SNRdB * 100 / 30
+	if m, ok := st.Muxes[muxID]; ok && m.Signal != nil {
+		c := *m.Signal
+		return &c
 	}
-	switch {
-	case s.UNCDelta > 0 || (s.BER > 1e-3):
-		return "poor"
-	case snr >= 0 && snr < 40:
-		return "fair"
-	case snr >= 0 && snr < 60:
-		return "good"
-	}
-	return "excellent"
+	return nil
 }
 
 func (s *Server) apiSystem(w http.ResponseWriter, r *http.Request) {
@@ -310,6 +310,7 @@ type muxOut struct {
 
 func (s *Server) apiMuxes(w http.ResponseWriter, r *http.Request) {
 	netID := r.URL.Query().Get("network")
+	live := s.tm.LiveMuxSignals()
 	var out []muxOut
 	s.st.View(func(st *store.State) {
 		for _, m := range st.Muxes {
@@ -317,6 +318,7 @@ func (s *Server) apiMuxes(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			mo := muxOut{Mux: *m, Label: dvb.DescribeTuning(m.Tuning)}
+			mo.Signal = muxSignal(live, st, m.ID)
 			if m.File != "" {
 				mo.Label = filepath.Base(m.File)
 			}
@@ -409,11 +411,13 @@ func (s *Server) apiScanMux(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiServices(w http.ResponseWriter, r *http.Request) {
 	type svcOut struct {
 		store.Service
-		Mux     string   `json:"mux"`
-		Network string   `json:"network"`
-		Mapped  []string `json:"mappedTo"`
+		Mux     string            `json:"mux"`
+		Network string            `json:"network"`
+		Mapped  []string          `json:"mappedTo"`
+		Signal  *store.SignalSnap `json:"signal,omitempty"`
 	}
 	muxID := r.URL.Query().Get("mux")
+	live := s.tm.LiveMuxSignals()
 	var out []svcOut
 	s.st.View(func(st *store.State) {
 		mapped := map[string][]string{}
@@ -426,7 +430,7 @@ func (s *Server) apiServices(w http.ResponseWriter, r *http.Request) {
 			if muxID != "" && sv.MuxID != muxID {
 				continue
 			}
-			so := svcOut{Service: *sv, Mapped: mapped[sv.ID]}
+			so := svcOut{Service: *sv, Mapped: mapped[sv.ID], Signal: muxSignal(live, st, sv.MuxID)}
 			if m, ok := st.Muxes[sv.MuxID]; ok {
 				so.Mux = dvb.DescribeTuning(m.Tuning)
 				if m.File != "" {
@@ -484,17 +488,32 @@ func (s *Server) apiMap(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiChannels(w http.ResponseWriter, r *http.Request) {
 	type chOut struct {
 		store.Channel
-		ServiceNames []string   `json:"serviceNames"`
-		Now          *epg.Event `json:"now,omitempty"`
-		Next         *epg.Event `json:"next,omitempty"`
-		StreamURL    string     `json:"streamUrl"`
+		ServiceNames []string          `json:"serviceNames"`
+		Now          *epg.Event        `json:"now,omitempty"`
+		Next         *epg.Event        `json:"next,omitempty"`
+		StreamURL    string            `json:"streamUrl"`
+		Signal       *store.SignalSnap `json:"signal,omitempty"`
 	}
 	base := s.baseURL(r)
 	now := time.Now()
+	live := s.tm.LiveMuxSignals()
 	var out []chOut
 	for _, c := range s.channelsSorted(true) {
 		co := chOut{Channel: *c, StreamURL: base + "/stream/channel/" + c.ID}
 		s.st.View(func(st *store.State) {
+			// Live reading of whichever service is being received, else the primary's last reading.
+			for i, sid := range c.Services {
+				sv, ok := st.Services[sid]
+				if !ok {
+					continue
+				}
+				if _, isLive := live[sv.MuxID]; isLive || (i == 0 && co.Signal == nil) {
+					co.Signal = muxSignal(live, st, sv.MuxID)
+					if isLive {
+						break
+					}
+				}
+			}
 			for _, sid := range c.Services {
 				name := sid
 				if sv, ok := st.Services[sid]; ok {

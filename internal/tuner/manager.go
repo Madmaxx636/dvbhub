@@ -131,7 +131,16 @@ func (m *Manager) Reload() {
 		}
 	}
 	m.tuners = tuners
+	holds := map[*hwSource]bool{}
+	for _, t := range tuners {
+		if hw, ok := t.src.(*hwSource); ok {
+			holds[hw] = t.cfg.Hold && t.cfg.Enabled
+		}
+	}
 	m.mu.Unlock()
+	for hw, on := range holds {
+		hw.SetHold(on)
+	}
 	if len(missing) > 0 {
 		m.st.Update(func(st *store.State) error {
 			for _, c := range missing {
@@ -157,6 +166,7 @@ func (m *Manager) AddTap(fn func(muxID string, pkts []byte)) {
 type Request struct {
 	Services []string // service ids in failover order
 	MuxID    string   // raw full-mux subscription (scan, EPG)
+	Tuner    string   // only use this tuner (alignment); empty = any
 	Weight   int
 	Name     string
 	Client   string
@@ -222,7 +232,7 @@ func (m *Manager) attachLocked(sub *Subscription, muxID string, svc *store.Servi
 }
 
 func (m *Manager) attachAvoidLocked(sub *Subscription, muxID string, svc *store.Service, avoid *Tuner) error {
-	if s := m.sessions[muxID]; s != nil && !s.stopped {
+	if s := m.sessions[muxID]; s != nil && !s.stopped && (sub.req.Tuner == "" || s.tuner.src.Key() == sub.req.Tuner) {
 		s.addLocked(sub, svc)
 		return nil
 	}
@@ -241,7 +251,7 @@ func (m *Manager) attachAvoidLocked(sub *Subscription, muxID string, svc *store.
 	if !found {
 		return fmt.Errorf("mux %s not found", muxID)
 	}
-	t := m.pickTunerLocked(mux, net, sub.Weight, avoid)
+	t := m.pickTunerLocked(mux, net, sub.Weight, avoid, sub.req.Tuner)
 	if t == nil {
 		return ErrNoTuner
 	}
@@ -275,10 +285,10 @@ func compatible(t *Tuner, mux store.Mux, net store.Network) bool {
 
 // pickTunerLocked chooses an idle tuner, or one whose users all have lower
 // weight. The avoid tuner (one that just lost signal) is used only as a last resort.
-func (m *Manager) pickTunerLocked(mux store.Mux, net store.Network, weight int, avoid *Tuner) *Tuner {
+func (m *Manager) pickTunerLocked(mux store.Mux, net store.Network, weight int, avoid *Tuner, only string) *Tuner {
 	var cands []*Tuner
 	for _, t := range m.tuners {
-		if compatible(t, mux, net) {
+		if compatible(t, mux, net) && (only == "" || t.src.Key() == only) {
 			cands = append(cands, t)
 		}
 	}
@@ -353,9 +363,76 @@ func (m *Manager) sessionEnded(s *session) {
 		delete(m.sessions, s.mux.ID)
 	}
 	if s.tuner.sess == s {
+		// Remember the last reading so muxes and channels keep showing signal bars.
+		if sig := s.tuner.signal; !sig.Updated.IsZero() {
+			m.saveSignal(s.mux.ID, sig)
+		}
 		s.tuner.sess = nil
 		s.tuner.signal = dvb.Signal{}
 	}
+}
+
+// saveSignal stores a signal snapshot on a mux (asynchronously).
+func (m *Manager) saveSignal(muxID string, sig dvb.Signal) {
+	snap := sig.Snapshot()
+	go m.st.Update(func(st *store.State) error {
+		if mx, ok := st.Muxes[muxID]; ok {
+			mx.Signal = &snap
+		}
+		return nil
+	})
+}
+
+// MuxSignal reads the current signal of the tuner receiving muxID, if any.
+func (m *Manager) MuxSignal(muxID string) (dvb.Signal, bool) {
+	m.mu.Lock()
+	s := m.sessions[muxID]
+	m.mu.Unlock()
+	if s == nil {
+		return dvb.Signal{}, false
+	}
+	s.mu.Lock()
+	st := s.stream
+	s.mu.Unlock()
+	if st == nil {
+		return dvb.Signal{StrengthPct: -1, SNRPct: -1, BER: -1, Updated: time.Now()}, true
+	}
+	return st.Signal(), true
+}
+
+// LiveMuxSignals returns the latest once-a-second reading for every tuned mux.
+func (m *Manager) LiveMuxSignals() map[string]dvb.Signal {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := map[string]dvb.Signal{}
+	for _, t := range m.tuners {
+		if t.sess != nil && !t.signal.Updated.IsZero() {
+			out[t.sess.mux.ID] = t.signal
+		}
+	}
+	return out
+}
+
+// TunerSignal reads a tuner's signal right now (for antenna alignment).
+func (m *Manager) TunerSignal(key string) (sig dvb.Signal, state, mux string, ok bool) {
+	m.mu.Lock()
+	var s *session
+	for _, t := range m.tuners {
+		if t.src.Key() == key {
+			ok, s = true, t.sess
+		}
+	}
+	m.mu.Unlock()
+	if s == nil {
+		return dvb.Signal{StrengthPct: -1, SNRPct: -1, BER: -1}, "idle", "", ok
+	}
+	s.mu.Lock()
+	st, state, mux := s.stream, s.state, MuxLabel(s.mux)
+	s.mu.Unlock()
+	if st == nil {
+		return dvb.Signal{StrengthPct: -1, SNRPct: -1, BER: -1, Updated: time.Now()}, state, mux, true
+	}
+	return st.Signal(), state, mux, true
 }
 
 // SimulateDrop makes a virtual tuner lose signal (for testing recovery).
@@ -441,6 +518,10 @@ type TunerStatus struct {
 	Retunes   int               `json:"retunes"`
 	Outage    float64           `json:"outageSeconds"`
 	Signal    dvb.Signal        `json:"signal"`
+	Bars      int               `json:"bars"`
+	Quality   string            `json:"quality"`
+	Hold      string            `json:"hold,omitempty"`  // held, blocked: ...
+	Users     []dvb.Proc        `json:"users,omitempty"` // other programs holding the adapter
 	Kbps      float64           `json:"kbps"`
 	CCErrors  uint64            `json:"ccErrors"`
 	TEIErrors uint64            `json:"teiErrors"`
@@ -454,7 +535,14 @@ func (m *Manager) Status(withHistory bool) []TunerStatus {
 	var out []TunerStatus
 	for _, t := range m.tuners {
 		ts := TunerStatus{Key: t.src.Key(), Name: t.src.Name(), Virtual: t.src.Virtual(), DelSys: t.src.DelSys(),
-			Config: t.cfg, State: "idle", Signal: t.signal}
+			Config: t.cfg, State: "idle", Signal: t.signal, Bars: t.signal.Bars(), Quality: "idle"}
+		if t.sess != nil {
+			ts.Quality = t.signal.Quality()
+		}
+		if hw, ok := t.src.(*hwSource); ok {
+			ts.Hold = hw.HoldState()
+			ts.Users = dvb.DeviceUsers(hw.info.Adapter)
+		}
 		if withHistory {
 			ts.History = append([]Sample(nil), t.history...)
 		}

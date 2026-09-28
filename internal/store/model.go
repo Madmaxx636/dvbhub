@@ -32,17 +32,31 @@ type Network struct {
 	Orbital       string `json:"orbital,omitempty"`
 }
 
+// SignalSnap is a stored signal reading (taken during the last scan or stream).
+type SignalSnap struct {
+	Locked      bool      `json:"locked"`
+	StrengthPct float64   `json:"strengthPct"`
+	StrengthDBm *float64  `json:"strengthDbm,omitempty"`
+	SNRdB       *float64  `json:"snrDb,omitempty"`
+	SNRPct      float64   `json:"snrPct"`
+	Bars        int       `json:"bars"`
+	Quality     string    `json:"quality"`
+	At          time.Time `json:"at"`
+	Live        bool      `json:"live,omitempty"` // set by the API when the reading is current
+}
+
 type Mux struct {
-	ID         string    `json:"id"`
-	NetworkID  string    `json:"networkId"`
-	Tuning     Tuning    `json:"tuning"`
-	File       string    `json:"file,omitempty"` // virtual networks: TS file to play
-	TSID       uint16    `json:"tsid"`
-	ONID       uint16    `json:"onid"`
-	Enabled    bool      `json:"enabled"`
-	ScanStatus string    `json:"scanStatus"` // new, pending, scanning, ok, fail
-	ScanError  string    `json:"scanError,omitempty"`
-	LastScan   time.Time `json:"lastScan"`
+	ID         string      `json:"id"`
+	NetworkID  string      `json:"networkId"`
+	Tuning     Tuning      `json:"tuning"`
+	File       string      `json:"file,omitempty"` // virtual networks: TS file to play
+	TSID       uint16      `json:"tsid"`
+	ONID       uint16      `json:"onid"`
+	Enabled    bool        `json:"enabled"`
+	ScanStatus string      `json:"scanStatus"` // new, pending, scanning, ok, fail
+	ScanError  string      `json:"scanError,omitempty"`
+	LastScan   time.Time   `json:"lastScan"`
+	Signal     *SignalSnap `json:"signal,omitempty"`
 }
 
 type Stream struct {
@@ -97,6 +111,7 @@ type TunerConfig struct {
 	Networks    []string            `json:"networks"`
 	Priority    int                 `json:"priority"`      // higher is used first
 	TuneTimeout int                 `json:"tuneTimeout"`   // seconds
+	Hold        bool                `json:"hold"`          // keep the device open so other programs cannot use it
 	Sat         map[string]SatInput `json:"sat,omitempty"` // by network id
 }
 

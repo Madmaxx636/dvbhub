@@ -35,6 +35,12 @@ function h(tag, attrs, ...kids) {
   }
   return el;
 }
+// Like el.replaceChildren(...) but skips null/false entries and flattens arrays.
+function fill(el, ...kids) {
+  el.replaceChildren();
+  for (const k of kids.flat(Infinity)) if (k !== null && k !== undefined && k !== false) el.append(k);
+  return el;
+}
 const svgNS = 'http://www.w3.org/2000/svg';
 function s(tag, attrs) { const el = document.createElementNS(svgNS, tag); for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v); return el; }
 
@@ -59,6 +65,27 @@ function input(attrs) { return h('input', attrs); }
 function select(opts, value, attrs) {
   return h('select', attrs || {}, opts.map(o => { const [v, t] = Array.isArray(o) ? o : [o, o]; return h('option', { value: v, selected: String(v) === String(value) }, t); }));
 }
+// Phone-style signal bars from a signal snapshot ({bars, quality, live, strengthPct, snrDb, ...}).
+function sigBars(snap, opts = {}) {
+  const n = snap ? snap.bars : -1;
+  const color = n <= 0 ? 'var(--bad)' : n === 1 ? 'var(--bad)' : n === 2 ? 'var(--warn)' : n === 3 ? 'var(--ok)' : 'var(--good)';
+  const size = opts.size || 18;
+  const svg = s('svg', { viewBox: '0 0 20 16', width: size * 1.25, height: size, class: 'bars' });
+  for (let i = 0; i < 4; i++) {
+    const hgt = 4 + i * 4;
+    svg.append(s('rect', { x: i * 5, y: 16 - hgt, width: 3.6, height: hgt, rx: 1, fill: snap && i < n ? color : 'var(--line)' }));
+  }
+  if (!snap) return h('span', { class: 'sig muted small', title: 'No signal reading yet (scan or tune this mux)' }, svg, opts.label === false ? null : ' –');
+  const age = snap.live ? 'live' : snap.at && !snap.at.startsWith('0001') ? 'measured ' + fmtDate(snap.at) : '';
+  const detail = [snap.locked ? 'locked' : 'no lock',
+    snap.strengthPct >= 0 ? `strength ${Math.round(snap.strengthPct)}%` : null,
+    snap.snrDb != null ? `SNR ${snap.snrDb.toFixed(1)} dB` : snap.snrPct >= 0 ? `quality ${Math.round(snap.snrPct)}%` : null, age].filter(Boolean).join(' · ');
+  return h('span', { class: 'sig', title: detail }, svg,
+    opts.label === false ? null : h('span', { class: 'small ' + (snap.live ? '' : 'muted') }, ' ',
+      snap.snrDb != null ? snap.snrDb.toFixed(1) + ' dB' : snap.locked ? (snap.quality || '') : 'no lock'),
+    snap.live ? h('span', { class: 'live-dot', title: 'live' }) : null);
+}
+
 const levelClass = pct => pct < 0 ? '' : pct < 35 ? 'bad' : pct < 55 ? 'warn' : pct < 70 ? 'ok' : 'good';
 const qualityClass = { excellent: 'b-good', good: 'b-ok', fair: 'b-warn', poor: 'b-bad', 'no-lock': 'b-bad', idle: '' };
 const stateBadge = st => h('span', { class: 'badge ' + ({ streaming: 'b-good', tuning: 'b-accent', nosignal: 'b-bad' }[st] || '') }, st === 'nosignal' ? 'no signal' : st);
@@ -70,6 +97,7 @@ function every(ms, fn) { clearInterval(timer); fn(); timer = setInterval(fn, ms)
 const routes = {};
 async function route() {
   clearInterval(timer);
+  if (cleanup) { try { cleanup(); } catch { } cleanup = null; }
   const name = (location.hash || '#dashboard').slice(1).split('/')[0];
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + name));
   $view.replaceChildren();
@@ -111,7 +139,10 @@ function tunerCard(t) {
       h('div', {},
         h('div', { class: 'name' }, t.config.name || t.name, ' ', h('span', { class: 'muted small mono' }, t.key)),
         h('div', { class: 'small muted' }, t.state === 'idle' ? (t.config.enabled ? 'Idle' : 'Disabled') : t.mux, ' ', t.state !== 'idle' ? stateBadge(t.state) : null)),
-      h('span', { class: 'badge quality ' + (qualityClass[q] || '') }, q.replace('-', ' '))));
+      h('span', { style: 'margin-left:auto' }, t.state === 'idle' ? null : sigBars({ ...sig, bars: t.bars, quality: q, live: true }, { label: false, size: 22 })),
+      h('span', { class: 'badge quality ' + (qualityClass[q] || ''), style: 'margin-left:8px' }, q.replace('-', ' '))));
+  const holdLine = holdInfo(t);
+  if (holdLine) card.append(holdLine);
   if (t.state === 'idle') {
     card.append(h('div', { class: 'small muted' }, (t.delsys || []).join(' · ') || ''));
     return card;
@@ -152,6 +183,17 @@ function tunerCard(t) {
       h('button', { class: 'sm', onclick: () => act(() => api('POST', '/api/tuners-drop/' + t.key + '?seconds=20'), 'Simulating 20 s signal drop') }, 'Drop 20 s')));
   }
   return card;
+}
+
+// Exclusive-hold state and other programs using the adapter.
+function holdInfo(t) {
+  const users = t.users || [];
+  if (!t.hold && !users.length) return null;
+  const blocked = (t.hold || '').startsWith('blocked');
+  return h('div', { class: 'small', style: 'margin:-4px 0 10px' },
+    t.hold === 'held' ? h('span', { class: 'badge b-good', title: 'dvbhub keeps this device open so no other program can tune it' }, '🔒 held by dvbhub') : null,
+    blocked ? h('span', { class: 'badge b-bad' }, '⚠ ' + t.hold) : null,
+    users.length ? h('span', { class: 'badge b-warn', style: 'margin-left:6px' }, 'also open in: ' + users.map(u => `${u.name} (${u.pid})`).join(', ')) : null);
 }
 
 function quality(t) {
@@ -217,6 +259,7 @@ routes.tuners = async () => {
     const en = input({ type: 'checkbox', checked: c.enabled });
     const prio = input({ type: 'number', value: c.priority, style: 'width:80px' });
     const to = input({ type: 'number', value: c.tuneTimeout || 5, style: 'width:80px' });
+    const hold = input({ type: 'checkbox', checked: c.hold, disabled: t.virtual });
     const netBoxes = nets.filter(n => (n.type === 'virtual') === t.virtual).map(n => {
       const cb = input({ type: 'checkbox', checked: (c.networks || []).includes(n.id), 'data-id': n.id });
       return h('label', { class: 'row small' }, cb, n.name);
@@ -234,14 +277,16 @@ routes.tuners = async () => {
         val: () => ({ lnb: lnb.value, lofLow: +lo.value * 1000, lofHigh: +hi.value * 1000, switch: +sw.value * 1000, diseqcPort: +dq.value }) };
     });
     const save = async () => {
-      const body = { ...c, name: name.value, enabled: en.checked, priority: +prio.value, tuneTimeout: +to.value,
+      const body = { ...c, name: name.value, enabled: en.checked, priority: +prio.value, tuneTimeout: +to.value, hold: hold.checked,
         networks: netBoxes.map(l => l.querySelector('input')).filter(i => i.checked).map(i => i.dataset.id), sat: {} };
       sat.forEach(x => body.sat[x.id] = x.val());
       await act(() => api('PUT', '/api/tuners/' + t.key, body), 'Saved');
     };
     $view.append(h('div', { class: 'card' },
       h('div', { class: 'row' }, h('h2', {}, t.name), h('span', { class: 'mono muted' }, t.key), (t.delsys || []).map(d => h('span', { class: 'badge' }, d))),
-      h('div', { class: 'form' }, field('Name', name), field('Priority (higher first)', prio), field('Tune timeout (s)', to), h('label', { class: 'row' }, en, 'Enabled')),
+      holdInfo(t),
+      h('div', { class: 'form' }, field('Name', name), field('Priority (higher first)', prio), field('Tune timeout (s)', to), h('label', { class: 'row' }, en, 'Enabled'),
+        h('label', { class: 'row', title: 'Keep the device open at all times so Tvheadend or other programs cannot grab it. LNB power is switched off while idle.' }, hold, '🔒 Hold device exclusively')),
       h('div', { style: 'margin-top:12px' }, h('div', { class: 'small muted' }, 'Networks (none ticked = any compatible network)'), h('div', { class: 'row' }, netBoxes.length ? netBoxes : h('span', { class: 'small muted' }, 'No compatible networks yet'))),
       sat.map(x => x.el),
       h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'primary', onclick: save }, 'Save'))));
@@ -308,9 +353,10 @@ async function networkCard(n) {
 
   if (muxes?.length) {
     card.append(h('div', { class: 'tablewrap' }, h('table', {},
-      h('tr', {}, h('th', {}, 'Mux'), h('th', {}, 'TSID/ONID'), h('th', {}, 'Services'), h('th', {}, 'Scan'), h('th', {}, 'Last scan'), h('th', {}, '')),
+      h('tr', {}, h('th', {}, 'Mux'), h('th', {}, 'Signal'), h('th', {}, 'TSID/ONID'), h('th', {}, 'Services'), h('th', {}, 'Scan'), h('th', {}, 'Last scan'), h('th', {}, '')),
       muxes.map(m => h('tr', {},
         h('td', {}, m.label, m.enabled ? null : h('span', { class: 'badge', style: 'margin-left:6px' }, 'disabled')),
+        h('td', {}, sigBars(m.signal)),
         h('td', { class: 'mono' }, m.tsid ? `${m.tsid} / ${m.onid}` : '–'),
         h('td', {}, m.services),
         h('td', {}, scanBadge(m.scanStatus), m.scanError ? h('div', { class: 'small muted' }, m.scanError) : null),
@@ -340,6 +386,7 @@ routes.services = async () => {
         h('td', {}, h('b', {}, sv.name), h('div', { class: 'small muted' }, sv.provider)),
         h('td', {}, h('span', { class: 'badge' }, sv.kind), sv.scrambled ? h('span', { class: 'badge b-warn', style: 'margin-left:4px' }, 'scrambled') : null),
         h('td', {}, sv.lcn || ''),
+        h('td', {}, sigBars(sv.signal)),
         h('td', { class: 'small' }, sv.mux, h('div', { class: 'muted' }, sv.network)),
         h('td', { class: 'small mono' }, (sv.streams || []).filter(x => x.kind).map(x => x.kind + (x.lang ? '/' + x.lang : '')).join(' ')),
         h('td', { class: 'small' }, (sv.mappedTo || []).join(', ') || h('span', { class: 'muted' }, '—')),
@@ -355,9 +402,9 @@ routes.services = async () => {
       h('label', { class: 'row small', title: 'A service with the same name as an existing channel is added to that channel as a backup source' }, optMerge, 'Same name → failover'),
       h('button', { onclick: () => map([...selected]) }, 'Map selected'), h('button', { class: 'primary', onclick: () => map([]) }, 'Map all'))),
     h('div', { class: 'card tight tablewrap' }, h('table', {},
-      h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Service'), h('th', {}, 'Kind'), h('th', {}, 'LCN'), h('th', {}, 'Mux'), h('th', {}, 'Streams'), h('th', {}, 'Channel'), h('th', {}, 'On'), h('th', {}))), tbody)));
+      h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Service'), h('th', {}, 'Kind'), h('th', {}, 'LCN'), h('th', {}, 'Signal'), h('th', {}, 'Mux'), h('th', {}, 'Streams'), h('th', {}, 'Channel'), h('th', {}, 'On'), h('th', {}))), tbody)));
   render();
-  if (!svcs.length) tbody.append(h('tr', {}, h('td', { colspan: 9, class: 'empty' }, 'No services yet — scan a mux first.')));
+  if (!svcs.length) tbody.append(h('tr', {}, h('td', { colspan: 10, class: 'empty' }, 'No services yet — scan a mux first.')));
 };
 
 // ---------- channels ----------
@@ -386,7 +433,7 @@ routes.channels = async () => {
     renderSvcs();
     const save = () => act(() => api('PUT', '/api/channels/' + c.id, { ...c, number: +num.value, name: name.value, enabled: en.checked, epgId: epgId.value.trim(), profile: prof.value, icon: icon.value.trim(), services }), 'Saved');
     tbody.append(h('tr', {},
-      h('td', {}, num), h('td', {}, name, c.now ? h('div', { class: 'small muted' }, 'Now: ', c.now.title) : null), h('td', {}, en),
+      h('td', {}, num), h('td', {}, name, c.now ? h('div', { class: 'small muted' }, 'Now: ', c.now.title) : null), h('td', {}, sigBars(c.signal)), h('td', {}, en),
       h('td', {}, svcList), h('td', {}, epgId), h('td', {}, prof), h('td', {}, icon),
       h('td', {}, h('div', { class: 'row', style: 'gap:4px' },
         h('button', { class: 'sm primary', onclick: save }, 'Save'),
@@ -394,8 +441,8 @@ routes.channels = async () => {
         h('button', { class: 'sm danger', onclick: () => confirm('Delete channel ' + c.name + '?') && act(() => api('DELETE', '/api/channels/' + c.id), 'Deleted').then(route) }, '✕')))));
   }
   $view.append(h('div', { class: 'card tight tablewrap' }, h('table', {},
-    h('thead', {}, h('tr', {}, ['#', 'Name', 'On', 'Services (failover order)', 'XMLTV id', 'Profile', 'Icon', ''].map(t => h('th', {}, t)))), tbody)));
-  if (!chans?.length) tbody.append(h('tr', {}, h('td', { colspan: 8, class: 'empty' }, 'No channels yet — map services on the Services page.')));
+    h('thead', {}, h('tr', {}, ['#', 'Name', 'Signal', 'On', 'Services (failover order)', 'XMLTV id', 'Profile', 'Icon', ''].map(t => h('th', {}, t)))), tbody)));
+  if (!chans?.length) tbody.append(h('tr', {}, h('td', { colspan: 9, class: 'empty' }, 'No channels yet — map services on the Services page.')));
 };
 
 // ---------- guide ----------
@@ -512,6 +559,156 @@ routes.settings = async () => {
       h('div', { class: 'small muted', style: 'margin-top:8px' }, st.lastRun && !st.lastRun.startsWith('0001') ? `Last import ${fmtDate(st.lastRun)}: ${st.info}` : 'Not imported yet', st.lastError ? h('div', { style: 'color:var(--bad)' }, st.lastError) : null),
       h('div', { class: 'small muted' }, 'Channels with an XMLTV id use XMLTV; the rest use over-the-air EIT.')),
     h('button', { class: 'primary', onclick: save }, 'Save settings'));
+};
+
+// ---------- antenna / dish alignment ----------
+let cleanup = null; // called when leaving a page
+routes.align = async () => {
+  const [tuners, muxes] = await Promise.all([get('/api/tuners'), get('/api/muxes')]);
+  const tSel = select((tuners || []).filter(t => t.config.enabled).map(t => [t.key, `${t.config.name || t.name} (${t.key})`]));
+  const mSel = select((muxes || []).map(m => [m.id, `${m.network}: ${m.label}`]));
+  const toneBox = input({ type: 'checkbox' });
+  const view = h('div', {});
+  $view.append(h('h1', {}, 'Signal lock & antenna alignment'),
+    h('div', { class: 'card' },
+      h('div', { class: 'small muted', style: 'margin-bottom:10px' }, 'Tunes one mux on one tuner and shows the signal 4× a second. Point the antenna or dish for the highest SNR; the tone rises as quality improves and goes silent without lock.'),
+      h('div', { class: 'form' }, field('Tuner', tSel), field('Mux', mSel),
+        h('label', { class: 'row' }, toneBox, '🔊 Tone'),
+        h('div', { class: 'row' }, h('button', { class: 'primary', onclick: start }, 'Start'), h('button', { onclick: stop }, 'Stop')))),
+    view);
+  let polling = null, audio = null, osc = null, gain = null, hist = [], peak = -1, key = '';
+  function stopAudio() { try { osc && osc.stop(); audio && audio.close(); } catch { } audio = osc = gain = null; }
+  function tone(score, locked) {
+    if (!toneBox.checked) { stopAudio(); return; }
+    if (!audio) {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      osc = audio.createOscillator(); gain = audio.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audio.destination); gain.gain.value = 0; osc.start();
+    }
+    osc.frequency.setTargetAtTime(220 + Math.max(0, score) * 8, audio.currentTime, 0.05);
+    gain.gain.setTargetAtTime(locked ? 0.15 : 0, audio.currentTime, 0.05);
+  }
+  async function start() {
+    key = tSel.value;
+    hist = []; peak = -1;
+    try { await api('POST', '/api/align', { tuner: key, muxId: mSel.value }); }
+    catch (e) { toast(e.message, true); return; }
+    clearInterval(polling);
+    polling = setInterval(poll, 250);
+  }
+  async function stop() {
+    clearInterval(polling); polling = null; stopAudio();
+    if (key) await api('DELETE', '/api/align?tuner=' + encodeURIComponent(key)).catch(() => { });
+    view.replaceChildren(h('div', { class: 'card empty' }, 'Stopped.'));
+  }
+  cleanup = () => { clearInterval(polling); stopAudio(); if (key) api('DELETE', '/api/align?tuner=' + encodeURIComponent(key)).catch(() => { }); };
+  async function poll() {
+    let d;
+    try { d = await get('/api/align?tuner=' + encodeURIComponent(key)); } catch { return; }
+    const sg = d.signal || {};
+    const score = sg.snrDb != null ? sg.snrDb * 100 / 30 : sg.snrPct >= 0 ? sg.snrPct : sg.strengthPct;
+    hist.push({ score, locked: sg.locked }); if (hist.length > 240) hist.shift();
+    if (sg.locked && score > peak) peak = score;
+    tone(score, sg.locked);
+    const snrTxt = sg.snrDb != null ? [sg.snrDb.toFixed(1), 'dB'] : sg.snrPct >= 0 ? [Math.round(sg.snrPct), '%'] : ['–', ''];
+    const W = 600, H = 80, spark = s('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', style: 'width:100%;height:80px;display:block;margin-top:14px' });
+    hist.forEach((p, i) => { if (!p.locked) spark.append(s('rect', { x: i * W / 240, y: 0, width: W / 240 + 1, height: H, fill: 'color-mix(in srgb, var(--bad) 20%, transparent)' })); });
+    spark.append(s('polyline', { fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke',
+      points: hist.map((p, i) => `${i * W / 240},${H - Math.max(0, Math.min(100, p.score)) * H / 100}`).join(' ') }));
+    if (peak >= 0) spark.append(s('line', { x1: 0, x2: W, y1: H - peak * H / 100, y2: H - peak * H / 100, stroke: 'var(--good)', 'stroke-dasharray': '4 4' }));
+    view.replaceChildren(h('div', { class: 'card' },
+      h('div', { class: 'row' }, h('span', { class: 'lockbox ' + (sg.locked ? 'on' : 'off') }, sg.locked ? '● LOCKED' : '○ NO LOCK'),
+        h('span', { class: 'muted' }, d.mux || '', ' · ', d.state), h('span', { class: 'spacer' }), sigBars({ ...sg, bars: d.bars, quality: d.quality, live: true }, { label: false, size: 48 })),
+      h('div', { class: 'align-big', style: 'margin-top:18px' },
+        h('div', {}, h('div', { class: 'small muted' }, 'Signal quality (SNR)'), h('div', { class: 'align-num' }, snrTxt[0], h('small', {}, ' ' + snrTxt[1]))),
+        h('div', {},
+          h('div', { class: 'small muted' }, `Quality ${Math.round(Math.max(0, score))}%`, peak >= 0 ? h('span', { class: 'peak' }, ` · peak ${Math.round(peak)}%`) : null),
+          h('div', { class: 'bigbar' }, h('i', { style: `width:${Math.max(0, Math.min(100, score))}%;background:var(--${levelClass(score) || 'idle'})` })),
+          h('div', { class: 'small muted', style: 'margin-top:10px' }, 'Strength ', sg.strengthPct >= 0 ? Math.round(sg.strengthPct) + '%' : '–', sg.strengthDbm != null ? ` (${sg.strengthDbm.toFixed(1)} dBm)` : ''),
+          h('div', { class: 'bigbar', style: 'height:10px' }, h('i', { style: `width:${Math.max(0, sg.strengthPct)}%;background:var(--muted)` })))),
+      spark,
+      h('div', { class: 'stats' },
+        h('div', { class: 'stat' }, h('div', { class: 'k' }, 'Bit error rate'), h('div', { class: 'v' }, fmtBER(sg.ber))),
+        h('div', { class: 'stat' }, h('div', { class: 'k' }, 'Uncorrected'), h('div', { class: 'v' }, sg.unc ?? 0)),
+        h('div', { class: 'stat' }, h('div', { class: 'k' }, 'Frontend status'), h('div', { class: 'v small' }, (sg.status || []).join(' ') || '–')),
+        h('div', { class: 'stat' }, h('div', { class: 'k' }, 'Peak'), h('div', { class: 'v' }, peak >= 0 ? Math.round(peak) + '%' : '–', ' ', h('button', { class: 'sm', onclick: () => { peak = -1; } }, 'reset'))))));
+  }
+};
+
+// ---------- hardware & drivers ----------
+routes.hardware = async () => {
+  const load = async (refresh) => {
+    const d = await get('/api/hardware' + (refresh ? '?refresh=1' : ''));
+    render(d);
+  };
+  const statusBadge = st => h('span', { class: 'badge ' + ({ working: 'b-good', 'no-adapter': 'b-warn', 'no-driver': 'b-bad' }[st] || '') },
+    { working: 'working', 'no-adapter': 'driver loaded, no adapter', 'no-driver': 'no driver' }[st] || st);
+  let jobTimer = null;
+  cleanup = () => clearInterval(jobTimer);
+  function render(d) {
+    const r = d.report, inst = d.installer;
+    fill($view,
+      h('div', { class: 'row' }, h('h1', {}, 'Hardware & drivers'), h('span', { class: 'spacer' }), h('button', { onclick: () => load(true) }, 'Re-check')),
+      h('div', { class: 'card' },
+        h('h2', {}, r.summary),
+        h('div', { class: 'row small muted' }, `Kernel ${r.kernel}`, ' · ', `Secure Boot: ${r.secureBoot}`, r.container ? ' · running in a container' : '',
+          ' · adapters: ', (r.adapters || []).join(', ') || 'none'),
+        (r.notes || []).map(n => h('div', { class: 'small', style: 'margin-top:6px' }, 'ℹ ' + n))),
+      h('div', { class: 'card tight tablewrap' }, h('table', {},
+        h('tr', {}, ['Device', 'Brand', 'USB/PCI id', 'Driver', 'Status', 'Adapters'].map(x => h('th', {}, x))),
+        (r.devices || []).length ? r.devices.map(dev => [
+          h('tr', {}, h('td', {}, h('b', {}, dev.name), h('div', { class: 'small muted' }, dev.bus.toUpperCase())), h('td', {}, dev.brand), h('td', { class: 'mono' }, dev.id),
+            h('td', { class: 'mono' }, dev.driver || '–'), h('td', {}, statusBadge(dev.status)), h('td', {}, (dev.adapters || []).join(', ') || '–')),
+          dev.hints?.length ? h('tr', {}, h('td', { colspan: 6, class: 'small muted' }, dev.hints.map(x => h('div', {}, '→ ' + x)))) : null])
+          : h('tr', {}, h('td', { colspan: 6, class: 'empty' }, 'No tuner devices detected.')))),
+      (r.firmware || []).length ? h('div', { class: 'card' }, h('h2', {}, 'Firmware'),
+        h('table', {}, h('tr', {}, h('th', {}, 'File'), h('th', {}, 'Wanted by'), h('th', {}, '')),
+          r.firmware.map(f => h('tr', {}, h('td', { class: 'mono' }, f.file), h('td', { class: 'mono small' }, f.module),
+            h('td', {}, f.required ? h('span', { class: 'badge b-bad' }, 'failed to load') : f.present ? h('span', { class: 'badge b-good' }, 'present') : h('span', { class: 'badge b-warn' }, 'not installed')))))) : null,
+      (r.blacklisted || []).length ? h('div', { class: 'card' }, h('h2', {}, 'Blacklisted DVB modules'), r.blacklisted.map(b => h('div', { class: 'mono small' }, b))) : null,
+      installerCard(inst, d.actions, r.actions || []),
+      h('div', { class: 'card' }, h('h2', {}, 'Tuner devices in use'),
+        (d.tuners || []).filter(t => !t.virtual).length ? (d.tuners || []).filter(t => !t.virtual).map(t => h('div', { class: 'row', style: 'margin:4px 0' },
+          h('b', {}, t.config.name || t.name), h('span', { class: 'mono muted' }, t.key), holdInfo(t) || h('span', { class: 'small muted' }, 'not held; no other users seen'))) : h('div', { class: 'small muted' }, 'No hardware tuners.')),
+      (r.kernelLog || []).length ? h('details', { class: 'card' }, h('summary', {}, 'Kernel messages (DVB / firmware)'), h('pre', { class: 'log' }, r.kernelLog.join('\n'))) : null);
+  }
+  function installerCard(inst, actions, suggested) {
+    const card = h('div', { class: 'card' }, h('h2', {}, 'Driver & firmware installer'));
+    if (!inst.enabled) {
+      card.append(h('div', { class: 'small' }, 'The installer runs on the host (it needs root). Run it once in a terminal, or enable the web button so this page and the Jellyfin plugin can run it:'),
+        h('div', { class: 'small', style: 'margin-top:8px' }, h('b', {}, 'Install firmware now:')),
+        h('div', { class: 'mono copy', onclick: () => copy('curl -fsSL https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/deploy/install-drivers.sh | sudo bash -s -- --firmware') }, 'curl -fsSL https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/deploy/install-drivers.sh | sudo bash -s -- --firmware'),
+        h('div', { class: 'small', style: 'margin-top:8px' }, h('b', {}, 'Enable the web button'), ' (native install uses /var/lib/dvbhub; Docker uses the ./data folder next to docker-compose.yml):'),
+        h('div', { class: 'mono copy', onclick: () => copy(inst.command) }, inst.command),
+        h('div', { class: 'small muted', style: 'margin-top:6px' }, 'Click a command to copy it.'));
+      return card;
+    }
+    card.append(h('div', { class: 'small muted' }, `Enabled on host ${inst.host || ''} (installer v${inst.version || '?'}). Only these fixed actions can be run:`));
+    for (const [name, desc] of Object.entries(actions || {})) {
+      card.append(h('div', { class: 'row', style: 'margin-top:8px' },
+        h('button', { class: suggested.includes(name) ? 'primary' : '', onclick: () => confirm(`Run "${name}" on the host?\n\n${desc}`) && runAction(name) }, 'Run: ' + name),
+        h('span', { class: 'small' }, desc, suggested.includes(name) ? h('span', { class: 'badge b-accent', style: 'margin-left:6px' }, 'suggested') : null)));
+    }
+    const jobsEl = h('div', { style: 'margin-top:12px' });
+    card.append(jobsEl);
+    const showJobs = jobs => jobsEl.replaceChildren(...(jobs || []).map(j => h('details', { style: 'margin-top:6px' },
+      h('summary', {}, h('b', {}, j.action), ' · ', fmtDate(j.created), ' ', h('span', { class: 'badge ' + ({ ok: 'b-good', failed: 'b-bad', running: 'b-accent', queued: 'b-warn' }[j.status] || '') }, j.status),
+        j.rebootRecommended && j.status === 'ok' ? h('span', { class: 'badge b-warn', style: 'margin-left:6px' }, 'replug / reboot to load') : null),
+      h('pre', { class: 'log', 'data-job': j.id }, '…'))));
+    showJobs(inst.jobs);
+    jobsEl.addEventListener('toggle', async e => {
+      const pre = e.target.querySelector('pre[data-job]');
+      if (e.target.open && pre) pre.textContent = (await get('/api/hardware/jobs/' + pre.dataset.job)).log || '(no output yet)';
+    }, true);
+    clearInterval(jobTimer);
+    if ((inst.jobs || []).some(j => j.status === 'queued' || j.status === 'running')) jobTimer = setInterval(() => load(false), 3000);
+    return card;
+  }
+  async function runAction(action) {
+    await act(() => api('POST', '/api/hardware/install', { action }), `Queued "${action}" on the host`);
+    load(false);
+  }
+  await load(false);
 };
 
 route();

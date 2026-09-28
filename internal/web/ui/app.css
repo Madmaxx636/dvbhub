@@ -54,7 +54,7 @@ label.f input, label.f select { font-size: 14px; color: var(--text); }
 /* tuner signal cards */
 .tuner-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
 .tuner-head .name { font-weight: 650; }
-.quality { margin-left: auto; font-size: 13px; padding: 4px 12px; }
+.quality { font-size: 13px; padding: 4px 12px; }
 .meters { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .meter .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .meter .val { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -87,6 +87,22 @@ label.f input, label.f select { font-size: 14px; color: var(--text); }
 .g-times { display: flex; background: var(--panel2); border-bottom: 1px solid var(--line); }
 .g-times .g-ch { background: var(--panel2); }
 .g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bad); z-index: 1; }
+
+.sig { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.sig svg { flex: none; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-left: 5px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+
+/* alignment meter */
+.align-big { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+.align-num { font-size: 64px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.align-num small { font-size: 22px; color: var(--muted); font-weight: 500; }
+.lockbox { font-size: 20px; font-weight: 700; padding: 8px 16px; border-radius: 10px; display: inline-block; }
+.lockbox.on { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+.lockbox.off { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.bigbar { height: 22px; border-radius: 11px; background: var(--panel2); overflow: hidden; }
+.bigbar > i { display: block; height: 100%; transition: width .2s, background .2s; }
+.peak { font-size: 12px; color: var(--muted); }
+pre.log { background: var(--panel2); border-radius: 8px; padding: 10px; max-height: 360px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
 
 #toast { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 20; }
 #toast div { background: var(--text); color: var(--bg); padding: 9px 14px; border-radius: 8px; max-width: 420px; box-shadow: 0 6px 20px #0003; }

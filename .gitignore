@@ -1,2 +1,6 @@
 build/
 /dvbhub
+data/
+jellyfin-plugin/bin/
+jellyfin-plugin/obj/
+jellyfin-plugin/out/

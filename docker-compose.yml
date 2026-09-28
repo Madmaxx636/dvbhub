@@ -16,6 +16,12 @@ services:
     #   - "9980:9980"
     volumes:
       - ./data:/data
+      # Read-only views of the host's firmware and kernel modules, so the
+      # Hardware page can tell which tuner firmware is missing.
+      - /lib/firmware:/lib/firmware:ro
+      - /lib/modules:/lib/modules:ro
+    # Uncomment to let dvbhub see which host programs (e.g. Tvheadend) hold a tuner:
+    # pid: host
     # DVB tuners: passes every adapter under /dev/dvb. Devices are captured
     # when the container starts, so restart it after replugging a USB tuner.
     devices:

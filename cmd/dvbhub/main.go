@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"dvbhub/internal/epg"
+	"dvbhub/internal/hw"
 	"dvbhub/internal/scan"
 	"dvbhub/internal/store"
 	"dvbhub/internal/tuner"
@@ -29,8 +31,16 @@ func main() {
 	listen := flag.String("listen", ":9980", "HTTP listen address")
 	password := flag.String("password", os.Getenv("DVBHUB_PASSWORD"), "admin UI/API password (streams and lineups stay open)")
 	virtual := flag.Int("virtual", -1, "number of virtual file tuners (overrides setting; for testing)")
+	detect := flag.Bool("detect", false, "print a tuner hardware / driver / firmware report as JSON and exit")
 	flag.Parse()
 	log.SetFlags(log.Ldate | log.Ltime)
+
+	if *detect {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.Encode(hw.NewDetector(*dataDir).Report(true))
+		return
+	}
 
 	st, err := store.Open(*dataDir)
 	if err != nil {

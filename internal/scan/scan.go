@@ -93,15 +93,20 @@ func (s *Scanner) loop() {
 					remaining = append(remaining, id)
 					continue
 				}
-				s.finish(id, nil, err)
+				s.finish(id, nil, err, nil)
 				continue
 			}
 			progressed = true
 			s.active[id] = true
 			go func(id string, sub *tuner.Subscription) {
 				res, err := s.scanMux(id, sub)
+				var snap *store.SignalSnap
+				if sig, ok := s.tm.MuxSignal(id); ok {
+					sn := sig.Snapshot()
+					snap = &sn
+				}
 				sub.Close()
-				s.finish(id, res, err)
+				s.finish(id, res, err, snap)
 				s.mu.Lock()
 				delete(s.active, id)
 				s.mu.Unlock()
@@ -257,7 +262,7 @@ func (s *Scanner) merge(res *result, sdtParts map[byte]*ts.SDT, nitParts map[byt
 }
 
 // finish stores scan results.
-func (s *Scanner) finish(muxID string, res *result, scanErr error) {
+func (s *Scanner) finish(muxID string, res *result, scanErr error, sig *store.SignalSnap) {
 	var discovered []string
 	s.st.Update(func(state *store.State) error {
 		mux, ok := state.Muxes[muxID]
@@ -265,6 +270,9 @@ func (s *Scanner) finish(muxID string, res *result, scanErr error) {
 			return nil
 		}
 		mux.LastScan = time.Now()
+		if sig != nil {
+			mux.Signal = sig
+		}
 		if scanErr != nil {
 			mux.ScanStatus = "fail"
 			mux.ScanError = scanErr.Error()

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"dvbhub/internal/epg"
+	"dvbhub/internal/hw"
 	"dvbhub/internal/scan"
 	"dvbhub/internal/store"
 	"dvbhub/internal/tuner"
@@ -32,10 +33,13 @@ type Server struct {
 	eit      *epg.EITGrabber
 	password string
 	mux      *http.ServeMux
+	align    aligner
+	hw       *hw.Detector
 }
 
 func New(st *store.Store, tm *tuner.Manager, sc *scan.Scanner, g *epg.Guide, im *epg.Importer, eit *epg.EITGrabber, password string) *Server {
-	s := &Server{st: st, tm: tm, sc: sc, guide: g, xmltv: im, eit: eit, password: password, mux: http.NewServeMux()}
+	s := &Server{st: st, tm: tm, sc: sc, guide: g, xmltv: im, eit: eit, password: password, mux: http.NewServeMux(),
+		align: aligner{byTu: map[string]*alignSession{}}, hw: hw.NewDetector(st.Dir())}
 	s.routes()
 	return s
 }
@@ -118,6 +122,12 @@ func (s *Server) routes() {
 	api("POST /api/epg/xmltv/refresh", s.apiXMLTVRefresh)
 	api("POST /api/epg/automap", s.apiAutoMap)
 	api("DELETE /api/subscriptions/{id}", s.apiKillSub)
+	api("POST /api/align", s.alignStart)
+	api("GET /api/align", s.alignPoll)
+	api("DELETE /api/align", s.alignStop)
+	api("GET /api/hardware", s.apiHardware)
+	api("POST /api/hardware/install", s.apiHardwareInstall)
+	api("GET /api/hardware/jobs/{id}", s.apiHardwareJob)
 	api("GET /api/scanfiles", s.apiScanFiles)
 	api("GET /api/scanfile", s.apiScanFile)
 }

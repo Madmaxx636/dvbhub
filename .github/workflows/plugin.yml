@@ -1,0 +1,88 @@
+name: Jellyfin plugin
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths: ["jellyfin-plugin/**", ".github/workflows/plugin.yml"]
+  pull_request:
+    paths: ["jellyfin-plugin/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - jellyfin: "10.10"
+            tfm: net8.0
+            dotnet: 8.0.x
+            rev: 1
+          - jellyfin: "10.11"
+            tfm: net9.0
+            dotnet: 9.0.x
+            rev: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+      - name: Version
+        id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then base=${GITHUB_REF#refs/tags/v}; else base=0.0.${GITHUB_RUN_NUMBER}; fi
+          echo "version=$base.${{ matrix.rev }}" >> "$GITHUB_OUTPUT"
+      - name: Build
+        working-directory: jellyfin-plugin
+        run: |
+          dotnet build -c Release \
+            -p:TargetFramework=${{ matrix.tfm }} \
+            -p:JellyfinVersion=${{ matrix.jellyfin }}.* \
+            -p:PluginVersion=${{ steps.v.outputs.version }} \
+            -o out
+      - name: Package
+        run: |
+          name=dvbhub-jellyfin-${{ matrix.jellyfin }}_${{ steps.v.outputs.version }}.zip
+          (cd jellyfin-plugin/out && zip -j "$GITHUB_WORKSPACE/$name" Jellyfin.Plugin.DvbHub.dll)
+          echo "${{ matrix.jellyfin }} ${{ steps.v.outputs.version }} $name $(md5sum "$name" | cut -d' ' -f1)" > "info-${{ matrix.jellyfin }}.txt"
+          unzip -l "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ matrix.jellyfin }}
+          path: |
+            dvbhub-jellyfin-*.zip
+            info-*.txt
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Plugin repository manifest
+        run: |
+          tag=${GITHUB_REF#refs/tags/}
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          versions=""
+          for f in info-*.txt; do
+            read -r jf ver zip md5 < "$f"
+            entry=$(printf '{"version":"%s","changelog":"See https://github.com/%s/releases/tag/%s","targetAbi":"%s.0.0","sourceUrl":"https://github.com/%s/releases/download/%s/%s","checksum":"%s","timestamp":"%s"}' \
+              "$ver" "$GITHUB_REPOSITORY" "$tag" "$jf" "$GITHUB_REPOSITORY" "$tag" "$zip" "$md5" "$now")
+            versions="${versions:+$versions,}$entry"
+          done
+          cat > manifest.json <<EOF
+          [{"guid":"7b1e4c2a-5d3f-4e8b-9a61-2c0f8d9e4b17","name":"dvbhub","overview":"Control your dvbhub DVB tuner server from Jellyfin","description":"Tuners with signal bars, scanning, channels, antenna alignment, NVENC transcoding profiles and driver/firmware tools for dvbhub.","owner":"${GITHUB_REPOSITORY_OWNER}","category":"Live TV","versions":[${versions}]}]
+          EOF
+          python3 -m json.tool manifest.json
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dvbhub-jellyfin-*.zip
+            manifest.json
+          generate_release_notes: true

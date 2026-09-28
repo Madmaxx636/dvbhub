@@ -235,6 +235,12 @@ func OpenFrontend(adapter, index int) (*Frontend, error) {
 
 func (fe *Frontend) Close() error { return fe.f.Close() }
 
+// Idle turns LNB power off while the device is held open but not in use.
+// It is a no-op for frontends without LNB control.
+func (fe *Frontend) Idle() {
+	_ = ioctl(fe.f, feSetVoltage, 2) // SEC_VOLTAGE_OFF
+}
+
 // Tune programs the frontend and waits for lock.
 func (fe *Frontend) Tune(t store.Tuning, sat *store.SatInput, timeout time.Duration) error {
 	ds, ok := delsysByName[strings.ToUpper(t.DeliverySystem)]

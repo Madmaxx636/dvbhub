@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"dvbhub/internal/dvb"
@@ -37,6 +38,10 @@ type Stream interface {
 
 type hwSource struct {
 	info dvb.FrontendInfo
+
+	mu      sync.Mutex
+	held    *dvb.Frontend // open while "hold" is on, so no other program can tune it
+	holdErr error
 }
 
 func (h *hwSource) Key() string      { return h.info.Key }
@@ -44,27 +49,84 @@ func (h *hwSource) Name() string     { return h.info.Name }
 func (h *hwSource) DelSys() []string { return h.info.DelSys }
 func (h *hwSource) Virtual() bool    { return false }
 
+// SetHold opens (and keeps open) or releases the frontend. Linux allows only
+// one read-write opener per frontend, so holding it locks other programs out.
+func (h *hwSource) SetHold(on bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	switch {
+	case on && h.held == nil:
+		fe, err := dvb.OpenFrontend(h.info.Adapter, h.info.Frontend)
+		if err != nil {
+			h.holdErr = busyErr(err, h.info.Adapter)
+			return
+		}
+		fe.Idle()
+		h.held, h.holdErr = fe, nil
+	case !on && h.held != nil:
+		h.held.Close()
+		h.held = nil
+		h.holdErr = nil
+	case !on:
+		h.holdErr = nil
+	}
+}
+
+// HoldState reports "held", "blocked: ..." or "" when not holding.
+func (h *hwSource) HoldState() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	switch {
+	case h.held != nil:
+		return "held"
+	case h.holdErr != nil:
+		return "blocked: " + h.holdErr.Error()
+	}
+	return ""
+}
+
+func busyErr(err error, adapter int) error {
+	if errors.Is(err, syscall.EBUSY) {
+		return fmt.Errorf("device busy, in use by %s", dvb.DescribeUsers(adapter))
+	}
+	return err
+}
+
 func (h *hwSource) Open(ctx context.Context, mux store.Mux, sat *store.SatInput, timeout time.Duration) (Stream, error) {
-	fe, err := dvb.OpenFrontend(h.info.Adapter, h.info.Frontend)
-	if err != nil {
-		return nil, err
+	h.mu.Lock()
+	fe, held := h.held, h.held != nil
+	h.mu.Unlock()
+	if !held {
+		var err error
+		fe, err = dvb.OpenFrontend(h.info.Adapter, h.info.Frontend)
+		if err != nil {
+			return nil, busyErr(err, h.info.Adapter)
+		}
+	}
+	release := func() {
+		if held {
+			fe.Idle()
+		} else {
+			fe.Close()
+		}
 	}
 	if err := fe.Tune(mux.Tuning, sat, timeout); err != nil {
-		fe.Close()
+		release()
 		return nil, err
 	}
 	dmx, err := dvb.OpenDemux(h.info.Adapter, h.info.Frontend)
 	if err != nil {
-		fe.Close()
-		return nil, err
+		release()
+		return nil, busyErr(err, h.info.Adapter)
 	}
-	return &hwStream{fe: fe, dmx: dmx}, nil
+	return &hwStream{fe: fe, dmx: dmx, release: release}, nil
 }
 
 type hwStream struct {
-	fe  *dvb.Frontend
-	dmx *dvb.Demux
-	mu  sync.Mutex
+	fe      *dvb.Frontend
+	dmx     *dvb.Demux
+	release func()
+	mu      sync.Mutex
 }
 
 func (s *hwStream) Read(p []byte) (int, error)    { return s.dmx.Read(p) }
@@ -76,7 +138,8 @@ func (s *hwStream) Signal() dvb.Signal {
 }
 func (s *hwStream) Close() error {
 	s.dmx.Close()
-	return s.fe.Close()
+	s.release()
+	return nil
 }
 
 // ---- virtual (file backed) ----
