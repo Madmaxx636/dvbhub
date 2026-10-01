@@ -20,12 +20,14 @@ services:
       # Hardware page can tell which tuner firmware is missing.
       - /lib/firmware:/lib/firmware:ro
       - /lib/modules:/lib/modules:ro
+      # DVB tuners. /dev is shared so dvbhub starts even when no tuner is
+      # plugged in and sees tuners plugged in later; the rule below only lets
+      # it use DVB devices (character major 212), nothing else on the host.
+      - /dev:/dev
+    device_cgroup_rules:
+      - "c 212:* rmw"
     # Uncomment to let dvbhub see which host programs (e.g. Tvheadend) hold a tuner:
     # pid: host
-    # DVB tuners: passes every adapter under /dev/dvb. Devices are captured
-    # when the container starts, so restart it after replugging a USB tuner.
-    devices:
-      - /dev/dvb:/dev/dvb
     environment:
       - TZ=Europe/London          # set yours; the EPG and guide use local time
       # - DVBHUB_PASSWORD=change-me  # protect the admin UI (streams stay open)
