@@ -27,12 +27,4 @@ services:
     # Uncomment to let dvbhub see which host programs (e.g. Tvheadend) hold a tuner:
     # pid: host
     #
-    # NVIDIA GPU transcoding: install the NVIDIA Container Toolkit on the host,
-    # then uncomment these lines. Intel and AMD GPUs work without them.
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu, video, compute, utility]
+    # NVIDIA GPU: see docker-compose.nvidia.yml. Intel and AMD GPUs work as is.

@@ -1,0 +1,14 @@
+# Gives dvbhub the NVIDIA GPU for transcoding (NVENC/NVDEC).
+# Needs the NVIDIA driver and the NVIDIA Container Toolkit on the host.
+# Turn it on once, in the folder with docker-compose.yml:
+#   echo COMPOSE_FILE=docker-compose.yml:docker-compose.nvidia.yml > .env
+# After that, plain "docker compose up -d" includes the GPU.
+services:
+  dvbhub:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video, compute, utility]

@@ -45,7 +45,17 @@ docker compose pull
 docker compose up -d
 ```
 
-[docker-compose.yml](docker-compose.yml) uses host networking (so Jellyfin finds dvbhub by itself), keeps everything in `./data`, and gives dvbhub the TV tuners and Intel/AMD GPUs. **NVIDIA GPU:** install the NVIDIA Container Toolkit on the host, then uncomment the `deploy:` block at the end of the file.
+[docker-compose.yml](docker-compose.yml) uses host networking (so Jellyfin finds dvbhub by itself), keeps everything in `./data`, and gives dvbhub the TV tuners and Intel/AMD GPUs.
+
+**NVIDIA GPU:** with the NVIDIA driver and the NVIDIA Container Toolkit installed on the host, run these once in `~/dvbhub`, then `docker compose up -d` as usual:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/docker-compose.nvidia.yml
+```
+
+```bash
+echo COMPOSE_FILE=docker-compose.yml:docker-compose.nvidia.yml > .env
+```
 
 ## First steps
 
