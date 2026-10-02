@@ -1,42 +1,38 @@
-# dvbhub — pulls the prebuilt image from GitHub Container Registry.
-#   docker compose up -d        # install / start
-#   docker compose pull && docker compose up -d   # update
+# dvbhub: pulls the ready-made image from GitHub.
+#   docker compose up -d       start (and install)
+#   docker compose pull        then "docker compose up -d" again to update
 services:
   dvbhub:
     image: ghcr.io/madmaxx636/dvbhub:latest
-    # To build from source instead of pulling, replace "image:" with:
-    # build: https://github.com/Madmaxx636/dvbhub.git
     container_name: dvbhub
     restart: unless-stopped
-    # Host networking lets Jellyfin/Plex find dvbhub via SSDP and keeps
-    # stream URLs identical inside and outside Docker. Without it, remove this
-    # line and uncomment "ports" (then enter the tuner URL by hand).
+    # Host networking lets Jellyfin and Plex find dvbhub automatically and
+    # keeps stream addresses the same inside and outside Docker.
     network_mode: host
-    # ports:
-    #   - "9980:9980"
     volumes:
-      - ./data:/data
+      - ./data:/data                       # channels, settings, guide
       # Read-only views of the host's firmware and kernel modules, so the
-      # Hardware page can tell which tuner firmware is missing.
+      # Tuners page can tell which firmware is missing.
       - /lib/firmware:/lib/firmware:ro
       - /lib/modules:/lib/modules:ro
-      # DVB tuners. /dev is shared so dvbhub starts even when no tuner is
-      # plugged in and sees tuners plugged in later; the rule below only lets
-      # it use DVB devices (character major 212), nothing else on the host.
+      # /dev is shared so dvbhub also sees tuners plugged in after it started.
+      # The rules below only allow TV tuners (212) and GPUs (226).
       - /dev:/dev
     device_cgroup_rules:
       - "c 212:* rmw"
+      - "c 226:* rmw"
+    environment:
+      - TZ=America/New_York          # your time zone (only affects log times)
+      # - DVBHUB_PASSWORD=change-me  # protect the web page; Jellyfin's streams stay open
     # Uncomment to let dvbhub see which host programs (e.g. Tvheadend) hold a tuner:
     # pid: host
-    environment:
-      - TZ=Europe/London          # set yours; the EPG and guide use local time
-      # - DVBHUB_PASSWORD=change-me  # protect the admin UI (streams stay open)
-    # NVIDIA GPU for NVENC/NVDEC. Requires the NVIDIA Container Toolkit on the
-    # host. Delete this block if you have no NVIDIA GPU.
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu, video, compute, utility]
+    #
+    # NVIDIA GPU transcoding: install the NVIDIA Container Toolkit on the host,
+    # then uncomment these lines. Intel and AMD GPUs work without them.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu, video, compute, utility]

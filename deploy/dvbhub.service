@@ -1,7 +1,7 @@
 # Reference copy of the unit written by install.sh. The dvbhub user must be
 # in the "video" group (DVB devices) and "render" if present (NVENC).
 [Unit]
-Description=dvbhub DVB tuner server
+Description=dvbhub TV tuner server
 After=network-online.target
 Wants=network-online.target
 
@@ -11,7 +11,7 @@ ExecStart=/usr/local/bin/dvbhub -data /var/lib/dvbhub -listen :9980
 StateDirectory=dvbhub
 Restart=on-failure
 RestartSec=3
-# Uncomment to password-protect the admin UI (streams/lineups for Jellyfin stay open):
+# Uncomment to password-protect the web page (Jellyfin's streams and lineups stay open):
 #Environment=DVBHUB_PASSWORD=change-me
 
 [Install]

@@ -1,106 +1,104 @@
 # dvbhub
 
-A DVB tuner server that replaces Tvheadend for a Jellyfin (or Plex) setup: a single Go binary with no dependencies beyond ffmpeg.
+A TV tuner server for Jellyfin (and Plex): one small Go program plus ffmpeg. It replaces Tvheadend for a Jellyfin setup.
 
-- **Tuners:** DVB-T/T2, DVB-C, DVB-S/S2 and ATSC through the Linux DVB API v5, with universal LNB and DiSEqC 1.0 support. Scan tables use the dtv-scan-tables (dvbv5) or legacy format, and new muxes are discovered from the NIT.
-- **Channels:** services come from PAT/PMT/SDT, and logical channel numbers from the NIT. A channel can list backup services on other muxes or tuners, and mapping services with the same name onto one channel creates those backups automatically.
-- **Signal-loss handling:** clients are never disconnected because of a signal drop. They receive PAT and null packets while the tuner is re-tuned, and a channel moves to its backup service on another tuner after 8 s.
-- **Signal monitoring:** each tuner shows strength (% and dBm), SNR in dB, BER, uncorrected blocks, continuity errors, bitrate, a one-word verdict and a 5-minute history. `GET /api/signal` returns the same data as compact JSON for scripts.
-- **Transcoding profiles:** passthrough, NVENC H.264/HEVC/AV1 with NVDEC decode and CUDA deinterlace/scale, or x264/x265. Each profile has CBR/VBR/CQ rate control, target, peak and VBV buffer settings, resolution, frame rate and audio settings. ffmpeg restarts automatically and falls back to CPU decode if NVDEC fails. GPU load comes from `nvidia-smi`.
-- **Jellyfin integration:** HDHomeRun emulation, plus M3U and an XMLTV export. Every profile gets its own tuner URL (`/p/<profile>`), so Jellyfin can have both a passthrough tuner and an NVENC tuner.
-- **EPG:** over-the-air EIT (present/following and schedule, including other muxes, plus periodic grabs from idle muxes) and XMLTV import, with automatic name matching.
-- **Signal bars everywhere:** every scan records a signal reading per mux, so muxes, services and channels all show phone-style bars. Anything being received shows live bars.
-- **Exclusive hold:** a tuner can be kept open by dvbhub so Tvheadend or other programs can't grab it. LNB power is switched off while idle. The UI shows which other programs have an adapter open.
-- **Signal lock / antenna alignment:** hold one tuner on one mux and read the signal 4× a second. There's a large SNR readout, lock indicator, peak hold, and an optional tone whose pitch rises with quality.
-- **Hardware & drivers:** detects USB/PCI tuners from any brand, whether a driver is bound, whether a DVB adapter was created, missing firmware (from each module's firmware list and the kernel log), blacklisted modules and Secure Boot. A host installer handles firmware and the TBS driver build, and can optionally be triggered from the UI or Jellyfin.
-- **Jellyfin plugin:** full control from Jellyfin's dashboard, including tuners with bars, channels, scanning, alignment, transcoding, hardware and one-click Live TV setup.
-- **Recording** is left to Jellyfin's DVR, which records through the HDHomeRun tuner.
-
-## Build
-
-```bash
-go build -o dvbhub ./cmd/dvbhub
-```
-
-## Run
-
-```bash
-./dvbhub -data ~/.dvbhub -listen :9980
-```
-
-Open `http://<server>:9980/`, then:
-
-1. **Networks:** add a network (DVB-T/C/S or ATSC). Import a scan table, or add a mux by hand; scanning starts automatically. For US over-the-air, pick ATSC and import `us-ATSC-center-frequencies-8VSB`; channel names and numbers (3.1, 3.2…) come from the station's PSIP virtual channel table.
-2. **Services:** click **Map all**. With "Same name → failover" ticked, identical channels on different muxes become backups.
-3. **Settings:** add XMLTV sources if you want them. Channels without an XMLTV id use the over-the-air EPG.
-
-The user running dvbhub needs read/write access to `/dev/dvb/*`, which usually means membership of the `video` group.
-
-## Install as a service
-
-```bash
-go build -o dvbhub ./cmd/dvbhub
-sudo deploy/install.sh ./dvbhub
-```
-
-The script creates a `dvbhub` system user (in the `video`/`render` groups), installs the binary to `/usr/local/bin`, writes and starts a systemd unit, and keeps its data in `/var/lib/dvbhub`. Re-running it upgrades in place.
+- **Find channels in one click.** Pick "Antenna — USA / Canada", "Cable — USA", "Antenna — Europe" or "Antenna — Australia". dvbhub scans every channel, skips empty ones quickly and adds what it finds. ATSC channel names and numbers (like 7.1) come from the stations. Satellite and DVB-C work by importing a scan table.
+- **Channels:** rename, renumber, hide, set a quality per channel, and give a channel backup services. If a station comes in on two frequencies, the weaker one becomes the backup automatically.
+- **Signal bars everywhere:** frequencies, stations, channels and tuners, plus a 5-minute history and an antenna alignment tool with an optional tone.
+- **TV guide** from the broadcast (ATSC PSIP and DVB EIT), plus optional XMLTV files, sent to Jellyfin as XMLTV.
+- **Passthrough or transcoding:** "Original" sends the broadcast untouched with almost no CPU. "Convert MPEG-2 only" converts US antenna channels to H.264 so phones and browsers can play them. Full profiles set codec (H.264/HEVC/AV1), resolution, bitrate (VBR, CBR or constant quality), peak bitrate, buffer, audio and more. GPUs are tested on startup (NVIDIA NVENC, Intel Quick Sync, AMD/Intel VAAPI), and if one fails mid-stream dvbhub falls back to the CPU.
+- **Signal loss doesn't drop viewers:** the connection is kept open while the tuner re-tunes, and dvbhub switches to a backup service on another tuner when one exists.
+- **Hardware and drivers:** finds USB and PCIe tuners and their drivers, and spots firmware a driver actually failed to load. It can install firmware, reset USB tuners and build TBS drivers from the web page or Jellyfin, after a one-time setup on the host.
+- **Simple, Advanced and Pro:** one set of settings; the level only changes how much is shown, so nothing set in Pro is undone in Simple.
+- **Jellyfin plugin** with the same controls, inside Jellyfin's dashboard (works from a phone), plus one-click "Add to Live TV". Builds for Jellyfin 10.10, 10.11 and 12.x.
+- **Light on resources:** a single process, about 20 MB of memory when idle. Passthrough uses almost no CPU.
 
 ## Install with Docker
 
-Every push to `main` is tested and then published by GitHub Actions to `ghcr.io/madmaxx636/dvbhub` (amd64 and arm64). On the server:
+On the server, run these one at a time.
 
 ```bash
-mkdir dvbhub && cd dvbhub
+mkdir ~/dvbhub
+```
+
+```bash
+cd ~/dvbhub
+```
+
+```bash
 curl -fsSLO https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/docker-compose.yml
+```
+
+```bash
 docker compose up -d
 ```
 
-To update: `docker compose pull && docker compose up -d`. Tagging a release (`git tag v1.0.0 && git push --tags`) also publishes `:1.0.0` and `:1.0`, so you can pin a version.
+Then open `http://<server>:9980/` in a browser.
 
-[docker-compose.yml](docker-compose.yml) passes `/dev/dvb` through, stores its data in `./data`, uses host networking (for SSDP discovery) and reserves the NVIDIA GPU. For the GPU, install the NVIDIA Container Toolkit on the host first. If you have no NVIDIA GPU, delete the `deploy:` block. Set `TZ` to your time zone. After replugging a USB tuner, restart the container.
+To update later, run these from `~/dvbhub`:
 
-## Jellyfin
+```bash
+docker compose pull
+```
 
-- **Dashboard → Live TV → Tuner Devices → Add → HD Homerun:** enter `http://<server>:9980`. For a GPU-transcoded variant, add another tuner with `http://<server>:9980/p/nvenc-h264-8m`.
-- **TV Guide Data Providers → XMLTV:** `http://<server>:9980/xmltv.xml`. Channel ids are the channel numbers.
-- **Recording:** use Jellyfin's own DVR. Recordings go through the same stream path, so signal drops don't end them.
+```bash
+docker compose up -d
+```
+
+[docker-compose.yml](docker-compose.yml) uses host networking (so Jellyfin finds dvbhub by itself), keeps everything in `./data`, and gives dvbhub the TV tuners and Intel/AMD GPUs. **NVIDIA GPU:** install the NVIDIA Container Toolkit on the host, then uncomment the `deploy:` block at the end of the file.
+
+## First steps
+
+1. **Scan:** choose where your TV comes from and press **Start scan**. Found channels are added automatically.
+2. **Jellyfin:** install the plugin (below) and press **Add dvbhub to Live TV**. Or add it by hand: Jellyfin **Dashboard → Live TV → Tuner Devices → + → HDHomeRun** with `http://<server>:9980`, then **TV Guide Data Providers → + → XMLTV** with `http://<server>:9980/xmltv.xml`.
+3. **Streaming** (optional): pick the quality Jellyfin gets. Each quality profile is also its own Jellyfin tuner address (`http://<server>:9980/p/<profile>`), so you can have an original and a converted version side by side.
 
 ## Jellyfin plugin
 
-Control dvbhub from Jellyfin's dashboard, in any browser including a phone, with no terminal needed. The page shows tuners with signal bars, viewers you can stop, channels (rename, renumber, profile), scanning, antenna alignment, transcoding profiles and bitrates, hardware/drivers, and one-click **Add dvbhub to Live TV**. All calls go through Jellyfin, which checks for an admin login, so dvbhub itself doesn't need to be reachable from your phone.
+1. In Jellyfin open **Dashboard → Plugins → Catalog → ⚙ (Repositories) → +**. Name it `dvbhub` and enter `https://github.com/Madmaxx636/dvbhub/releases/latest/download/manifest.json`.
+2. In **Catalog**, open **dvbhub → Install**, then restart Jellyfin.
+3. Open **Dashboard → TV Tuners (dvbhub)**, enter dvbhub's address as the Jellyfin server sees it (for example `http://192.168.1.10:9980`) and press **Save and connect**.
 
-Install:
-1. Jellyfin → **Dashboard → Plugins → Repositories (Catalog ⚙) → +**. Name it `dvbhub` and set the URL to `https://github.com/Madmaxx636/dvbhub/releases/latest/download/manifest.json`.
-2. **Catalog → dvbhub → Install**, then restart Jellyfin.
-3. **Dashboard → TV Tuners (dvbhub) → Setup:** enter dvbhub's URL as seen from the Jellyfin server, e.g. `http://192.168.1.10:9980`, then click **Add dvbhub to Live TV**.
+The plugin loads dvbhub's own interface through Jellyfin, so it has every control and always matches your dvbhub version. All calls go through Jellyfin's admin login, so dvbhub doesn't need to be reachable from your phone.
 
-Builds for Jellyfin 10.10 and 10.11 are published on every `v*` tag. Jellyfin picks the right one automatically. `python3 tools/plugin-preview.py` previews the plugin page against a running dvbhub without Jellyfin.
+## Drivers and firmware
 
-## Drivers & firmware
-
-The **Hardware** page (and the plugin's Hardware tab) diagnoses tuners. To install firmware on the host:
+The **Tuners** page shows each tuner device, its driver, and firmware a driver failed to load. To let dvbhub install firmware for you (from the web page or Jellyfin), run this one-time setup on the host. With Docker, run it in the folder with `docker-compose.yml`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/deploy/install-drivers.sh | sudo bash -s -- --firmware
+curl -fsSL https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/deploy/install-drivers.sh -o install-drivers.sh
 ```
-
-Other actions:
-- `--detect`: diagnosis only.
-- `--tbs`: builds TBS's open-source drivers for the running kernel. Re-run it after kernel updates. It needs Secure Boot off or module signing.
-- `--tools`: installs dvbv5-scan, dvb-fe-tool and similar tools.
-
-To run these from the web UI or Jellyfin instead of a terminal, enable the web trigger once:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Madmaxx636/dvbhub/main/deploy/install-drivers.sh | sudo bash -s -- --enable-web-trigger /var/lib/dvbhub
+sudo bash install-drivers.sh --enable-web-trigger ./data
 ```
 
-For Docker, use the `./data` folder next to `docker-compose.yml` instead of `/var/lib/dvbhub`. This installs a root systemd path unit that only accepts the fixed actions `firmware`, `tbs` and `tools`, written as request files into dvbhub's data folder. dvbhub itself never runs anything as root. Undo it with `--disable-web-trigger`.
+(Without Docker, use `/var/lib/dvbhub` instead of `./data`.) This installs a root systemd unit that only accepts four fixed actions written by dvbhub: `firmware`, `replug` (reset USB tuners), `tools` and `tbs`. dvbhub itself never runs anything as root. Turn it off with `--disable-web-trigger`. You can also run the actions by hand, for example `sudo bash install-drivers.sh --firmware`.
 
-## Testing without hardware
+## Install without Docker
 
-`tools/e2e.sh` generates test streams with ffmpeg and injects NIT and EIT tables with `tools/tsinject`. It then runs the whole server on virtual file-backed tuners and covers: scan, mapping, HDHomeRun, M3U, XMLTV, passthrough, signal drop with keepalive, re-tune, failover, CBR transcoding, signal bars, alignment mode and the installer bridge (39 checks). GitHub Actions runs it on every push. `tools/demo.sh` starts a demo instance with live viewers. On a virtual tuner, the dashboard's **Drop 5 s / Drop 20 s** buttons simulate signal loss.
+```bash
+go build -o dvbhub ./cmd/dvbhub
+```
+
+```bash
+sudo deploy/install.sh ./dvbhub
+```
+
+This creates a `dvbhub` system user (in the `video` and `render` groups), installs a systemd service and keeps data in `/var/lib/dvbhub`. Install `ffmpeg` for transcoding. Set `DVBHUB_PASSWORD` to protect the web page; Jellyfin's streams and lineups stay open.
+
+## For scripts
+
+- `GET /api/signal`: every tuner's signal as JSON.
+- `GET /api/status`: tuners, viewers, scans and guide.
+- HDHomeRun: `/discover.json`, `/lineup.json`, `/auto/v<number>`. M3U: `/playlist.m3u`. Guide: `/xmltv.xml`.
+
+## Development and tests
+
+- `bash tools/e2e.sh` generates test streams with ffmpeg, runs dvbhub on virtual (file-backed) tuners and checks scanning, mapping, HDHomeRun, streaming, signal loss and failover, recovery, CBR transcoding, "Convert MPEG-2 only", the guide (DVB and ATSC), alignment and the installer bridge. GitHub Actions runs it on every push. `bash tools/e2e.sh keep` leaves a demo server running.
+- `python3 tools/plugin-preview.py http://127.0.0.1:9980` previews the Jellyfin plugin page without Jellyfin at `http://127.0.0.1:8097/`.
+- The plugin builds with `dotnet build jellyfin-plugin -p:JellyfinTfm=net10.0 -p:JellyfinVersion=12.*` (or `net9.0`/`10.11.*`, `net8.0`/`10.10.*`).
 
 ## Not verified yet
 
-The hardware code paths (`internal/dvb`, exclusive hold, driver detection on real tuners), the host installer's `--firmware`/`--tbs` actions, NVENC, and the plugin inside a real Jellyfin have not been run on real hardware or a real Jellyfin server yet. The ioctl numbers and struct layouts were checked against the kernel headers, but real tuning, DiSEqC and signal statistics still need testing on the actual server. ATSC channel names, numbers and the over-the-air program guide (PSIP EIT/ETT) are read from the broadcast.
+Real tuner hardware (tuning, signal statistics, DiSEqC, exclusive hold), GPU transcoding on NVIDIA and AMD, the host installer's root actions, and the plugin inside a real Jellyfin server have not been run by these tests yet. The tests use virtual tuners and the plugin preview.

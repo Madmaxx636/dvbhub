@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"dvbhub/internal/store"
 )
 
 // ParseScanFile parses initial tuning data in dvbv5 format ([CHANNEL] blocks,
 // as shipped in dtv-scan-tables) or the legacy one-line-per-mux format.
-func ParseScanFile(text string) ([]store.Tuning, error) {
+func ParseScanFile(text string) ([]Tuning, error) {
 	if strings.Contains(text, "DELIVERY_SYSTEM") {
 		return parseV5(text)
 	}
@@ -73,14 +71,14 @@ func normPol(v string) string {
 	return ""
 }
 
-func parseV5(text string) ([]store.Tuning, error) {
-	var out []store.Tuning
+func parseV5(text string) ([]Tuning, error) {
+	var out []Tuning
 	var cur map[string]string
 	flush := func() error {
 		if cur == nil {
 			return nil
 		}
-		t := store.Tuning{DeliverySystem: normDelsys(cur["DELIVERY_SYSTEM"]), StreamID: -1}
+		t := Tuning{DeliverySystem: normDelsys(cur["DELIVERY_SYSTEM"]), StreamID: -1}
 		f, err := strconv.ParseUint(cur["FREQUENCY"], 10, 64)
 		if err != nil {
 			return fmt.Errorf("bad FREQUENCY %q", cur["FREQUENCY"])
@@ -140,8 +138,8 @@ func parseV5(text string) ([]store.Tuning, error) {
 	return out, nil
 }
 
-func parseLegacy(text string) ([]store.Tuning, error) {
-	var out []store.Tuning
+func parseLegacy(text string) ([]Tuning, error) {
+	var out []Tuning
 	sc := bufio.NewScanner(strings.NewReader(text))
 	for sc.Scan() {
 		f := strings.Fields(sc.Text())
@@ -164,7 +162,7 @@ func parseLegacy(text string) ([]store.Tuning, error) {
 		switch f[0] {
 		case "T", "T2":
 			// T freq bw fec_hi fec_lo mod transmission-mode guard-interval hierarchy
-			t := store.Tuning{DeliverySystem: "DVB-T", FrequencyKHz: uint32(num(1) / 1000), StreamID: -1,
+			t := Tuning{DeliverySystem: "DVB-T", FrequencyKHz: uint32(num(1) / 1000), StreamID: -1,
 				FEC: at(3), CodeRateLP: at(4), Modulation: normMod(at(5)), TransmissionMode: at(6), GuardInterval: at(7), Hierarchy: at(8)}
 			if f[0] == "T2" {
 				t.DeliverySystem = "DVB-T2"
@@ -176,7 +174,7 @@ func parseLegacy(text string) ([]store.Tuning, error) {
 			out = append(out, t)
 		case "C":
 			// C freq symbol_rate fec modulation
-			out = append(out, store.Tuning{DeliverySystem: "DVB-C", FrequencyKHz: uint32(num(1) / 1000), SymbolRate: uint32(num(2)),
+			out = append(out, Tuning{DeliverySystem: "DVB-C", FrequencyKHz: uint32(num(1) / 1000), SymbolRate: uint32(num(2)),
 				FEC: at(3), Modulation: normMod(at(4)), StreamID: -1})
 		case "S", "S1", "S2":
 			// S freq(kHz or Hz) pol symbol_rate fec [rolloff mod]
@@ -184,7 +182,7 @@ func parseLegacy(text string) ([]store.Tuning, error) {
 			if fr > 100e6 {
 				fr /= 1000
 			}
-			t := store.Tuning{DeliverySystem: "DVB-S", FrequencyKHz: uint32(fr), Polarization: normPol(at(2)),
+			t := Tuning{DeliverySystem: "DVB-S", FrequencyKHz: uint32(fr), Polarization: normPol(at(2)),
 				SymbolRate: uint32(num(3)), FEC: at(4), StreamID: -1}
 			if f[0] == "S2" {
 				t.DeliverySystem = "DVB-S2"
@@ -193,14 +191,14 @@ func parseLegacy(text string) ([]store.Tuning, error) {
 			}
 			out = append(out, t)
 		case "A":
-			out = append(out, store.Tuning{DeliverySystem: "ATSC", FrequencyKHz: uint32(num(1) / 1000), Modulation: normMod(at(2)), StreamID: -1})
+			out = append(out, Tuning{DeliverySystem: "ATSC", FrequencyKHz: uint32(num(1) / 1000), Modulation: normMod(at(2)), StreamID: -1})
 		}
 	}
 	return out, sc.Err()
 }
 
 // DescribeTuning returns a short human label like "DVB-T2 506 MHz".
-func DescribeTuning(t store.Tuning) string {
+func DescribeTuning(t Tuning) string {
 	mhz := float64(t.FrequencyKHz) / 1000
 	s := fmt.Sprintf("%s %g MHz", t.DeliverySystem, mhz)
 	if t.Polarization != "" {

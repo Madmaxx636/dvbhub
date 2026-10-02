@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"dvbhub/internal/store"
 )
 
 // score is a 0-100 figure of merit: SNR if the driver reports it, else strength.
@@ -65,8 +63,8 @@ func (s Signal) Bars() int {
 }
 
 // Snapshot converts a live reading to the persisted form.
-func (s Signal) Snapshot() store.SignalSnap {
-	return store.SignalSnap{Locked: s.Locked, StrengthPct: s.StrengthPct, StrengthDBm: s.StrengthDBm, SNRdB: s.SNRdB,
+func (s Signal) Snapshot() SignalSnap {
+	return SignalSnap{Locked: s.Locked, StrengthPct: s.StrengthPct, StrengthDBm: s.StrengthDBm, SNRdB: s.SNRdB,
 		SNRPct: s.SNRPct, Bars: s.Bars(), Quality: s.Quality(), At: time.Now()}
 }
 

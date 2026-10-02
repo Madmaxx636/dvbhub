@@ -2,7 +2,7 @@ name: Jellyfin plugin
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
     tags: ["v*"]
     paths: ["jellyfin-plugin/**", ".github/workflows/plugin.yml"]
   pull_request:
@@ -19,14 +19,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # rev orders the builds: Jellyfin installs the highest version whose
+          # targetAbi it supports, so newer Jellyfin must get a higher rev.
           - jellyfin: "10.10"
+            abi: "10.10.0.0"
             tfm: net8.0
             dotnet: 8.0.x
+            packages: "10.10.*"
             rev: 1
           - jellyfin: "10.11"
+            abi: "10.11.0.0"
             tfm: net9.0
             dotnet: 9.0.x
+            packages: "10.11.*"
             rev: 2
+          - jellyfin: "12"
+            abi: "12.0.0.0"
+            tfm: net10.0
+            dotnet: 10.0.x
+            packages: "12.*"
+            rev: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -42,14 +54,14 @@ jobs:
         run: |
           dotnet build -c Release \
             -p:JellyfinTfm=${{ matrix.tfm }} \
-            -p:JellyfinVersion=${{ matrix.jellyfin }}.* \
+            -p:JellyfinVersion="${{ matrix.packages }}" \
             -p:PluginVersion=${{ steps.v.outputs.version }} \
             -o out
       - name: Package
         run: |
           name=dvbhub-jellyfin-${{ matrix.jellyfin }}_${{ steps.v.outputs.version }}.zip
           (cd jellyfin-plugin/out && zip -j "$GITHUB_WORKSPACE/$name" Jellyfin.Plugin.DvbHub.dll)
-          echo "${{ matrix.jellyfin }} ${{ steps.v.outputs.version }} $name $(md5sum "$name" | cut -d' ' -f1)" > "info-${{ matrix.jellyfin }}.txt"
+          echo "${{ matrix.abi }} ${{ steps.v.outputs.version }} $name $(md5sum "$name" | cut -d' ' -f1)" > "info-${{ matrix.jellyfin }}.txt"
           unzip -l "$name"
       - uses: actions/upload-artifact@v4
         with:
@@ -71,15 +83,15 @@ jobs:
           tag=${GITHUB_REF#refs/tags/}
           now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           versions=""
-          for f in info-*.txt; do
-            read -r jf ver zip md5 < "$f"
-            entry=$(printf '{"version":"%s","changelog":"See https://github.com/%s/releases/tag/%s","targetAbi":"%s.0.0","sourceUrl":"https://github.com/%s/releases/download/%s/%s","checksum":"%s","timestamp":"%s"}' \
-              "$ver" "$GITHUB_REPOSITORY" "$tag" "$jf" "$GITHUB_REPOSITORY" "$tag" "$zip" "$md5" "$now")
+          for f in $(ls info-*.txt | sort -r); do
+            read -r abi ver zip md5 < "$f"
+            entry=$(printf '{"version":"%s","changelog":"See https://github.com/%s/releases/tag/%s","targetAbi":"%s","sourceUrl":"https://github.com/%s/releases/download/%s/%s","checksum":"%s","timestamp":"%s"}' \
+              "$ver" "$GITHUB_REPOSITORY" "$tag" "$abi" "$GITHUB_REPOSITORY" "$tag" "$zip" "$md5" "$now")
             versions="${versions:+$versions,}$entry"
           done
-          cat > manifest.json <<EOF
-          [{"guid":"7b1e4c2a-5d3f-4e8b-9a61-2c0f8d9e4b17","name":"dvbhub","overview":"Control your dvbhub DVB tuner server from Jellyfin","description":"Tuners with signal bars, scanning, channels, antenna alignment, NVENC transcoding profiles and driver/firmware tools for dvbhub.","owner":"${GITHUB_REPOSITORY_OWNER}","category":"Live TV","versions":[${versions}]}]
-          EOF
+          cat > manifest.json <<JSON
+          [{"guid":"7b1e4c2a-5d3f-4e8b-9a61-2c0f8d9e4b17","name":"dvbhub","overview":"Control your dvbhub TV tuner server from Jellyfin","description":"Channel scanning, channels, guide, signal bars, transcoding, tuners, drivers and antenna alignment for dvbhub.","owner":"${GITHUB_REPOSITORY_OWNER}","category":"Live TV","versions":[${versions}]}]
+          JSON
           python3 -m json.tool manifest.json
       - uses: softprops/action-gh-release@v2
         with:

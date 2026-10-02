@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"dvbhub/internal/ts"
+	ts "dvbhub/internal/mpegts"
 )
 
 func main() {

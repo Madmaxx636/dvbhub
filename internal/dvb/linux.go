@@ -15,11 +15,10 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
-
-	"dvbhub/internal/store"
 )
 
 // ioctl request numbers, verified against linux/dvb/*.h (DVB API 5.12, amd64).
@@ -163,29 +162,69 @@ type FrontendInfo struct {
 	Frontend int      `json:"frontend"`
 	Name     string   `json:"name"`
 	DelSys   []string `json:"delsys"`
+	OK       bool     `json:"ok"` // the driver answered
 }
 
-// Discover lists all DVB frontends under /dev/dvb.
+var (
+	probeMu   sync.Mutex
+	probing   = map[string]bool{} // probes still stuck inside a driver call
+	lastProbe = map[string]FrontendInfo{}
+)
+
+// Discover lists all DVB frontends under /dev/dvb. Frontends are probed in
+// parallel with a timeout: some drivers block in open/ioctl (e.g. while
+// loading firmware, ~3.5 s for an Si2157) and a broken one can block forever,
+// so a stuck probe is reported as not responding and never re-probed until it
+// returns.
 func Discover() []FrontendInfo {
 	paths, _ := filepath.Glob("/dev/dvb/adapter*/frontend*")
 	sort.Strings(paths)
-	var out []FrontendInfo
+	out := make([]FrontendInfo, 0, len(paths))
+	results := make([]chan FrontendInfo, 0, len(paths))
 	for _, p := range paths {
 		var a, fe int
 		if _, err := fmt.Sscanf(p, "/dev/dvb/adapter%d/frontend%d", &a, &fe); err != nil {
 			continue
 		}
 		info := FrontendInfo{Key: fmt.Sprintf("adapter%d/frontend%d", a, fe), Adapter: a, Frontend: fe}
-		// Some drivers block in open/ioctl (e.g. while loading firmware); never
-		// let one tuner stall startup.
-		done := make(chan FrontendInfo, 1)
-		go func(info FrontendInfo) { done <- probeFrontend(p, info) }(info)
-		select {
-		case info = <-done:
-		case <-time.After(20 * time.Second): // generous: some tuners load firmware on first open (Si2157: ~3.5 s)
-			info.Name = "not responding (driver busy or firmware missing)"
+		ch := make(chan FrontendInfo, 1)
+		results = append(results, ch)
+		probeMu.Lock()
+		stuck, prev := probing[p], lastProbe[p]
+		if !stuck {
+			probing[p] = true
 		}
-		out = append(out, info)
+		probeMu.Unlock()
+		if stuck {
+			if prev.OK {
+				ch <- prev // still busy with an earlier probe, but known good
+			} else {
+				info.Name = "not responding (driver busy or firmware missing)"
+				ch <- info
+			}
+			continue
+		}
+		go func(p string, info FrontendInfo) {
+			res := make(chan FrontendInfo, 1)
+			go func() {
+				r := probeFrontend(p, info)
+				probeMu.Lock()
+				delete(probing, p)
+				lastProbe[p] = r
+				probeMu.Unlock()
+				res <- r
+			}()
+			select {
+			case r := <-res:
+				ch <- r
+			case <-time.After(20 * time.Second):
+				info.Name = "not responding (driver busy or firmware missing)"
+				ch <- info
+			}
+		}(p, info)
+	}
+	for _, ch := range results {
+		out = append(out, <-ch)
 	}
 	return out
 }
@@ -200,6 +239,7 @@ func probeFrontend(path string, info FrontendInfo) FrontendInfo {
 	var raw [168]byte
 	if ioctl(f, feGetInfo, uintptr(unsafe.Pointer(&raw[0]))) == nil {
 		info.Name = strings.TrimRight(string(raw[:128]), "\x00")
+		info.OK = true
 	}
 	pl := newPropList(1)
 	pl.add(dtvEnumDelsys, 0)
@@ -255,7 +295,7 @@ func (fe *Frontend) Idle() {
 }
 
 // Tune programs the frontend and waits for lock.
-func (fe *Frontend) Tune(ctx context.Context, t store.Tuning, sat *store.SatInput, timeout time.Duration) error {
+func (fe *Frontend) Tune(ctx context.Context, t Tuning, sat *SatInput, timeout time.Duration) error {
 	ds, ok := delsysByName[strings.ToUpper(t.DeliverySystem)]
 	if !ok {
 		return fmt.Errorf("unsupported delivery system %q", t.DeliverySystem)
@@ -328,7 +368,10 @@ func (fe *Frontend) Tune(ctx context.Context, t store.Tuning, sat *store.SatInpu
 // WaitLock polls the frontend until it reports lock, the timeout expires or
 // ctx is cancelled (so an abandoned tune frees the tuner at once).
 func (fe *Frontend) WaitLock(ctx context.Context, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
+	start := time.Now()
+	deadline := start.Add(timeout)
+	quick := IsQuickScan(ctx)
+	sawSignal := false
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -336,6 +379,15 @@ func (fe *Frontend) WaitLock(ctx context.Context, timeout time.Duration) error {
 		st, err := fe.status()
 		if err == nil && st&feHasLock != 0 {
 			return nil
+		}
+		if err == nil && st&(feHasSignal|feHasCarrier) != 0 {
+			sawSignal = true
+		}
+		// While scanning, an empty channel shows no signal/carrier at all; give
+		// up early instead of waiting the full timeout (which must stay long
+		// enough for tuners that first load firmware, ~3.5 s for an Si2157).
+		if quick && !sawSignal && time.Since(start) > QuickScanGiveUp {
+			return ErrNoSignal
 		}
 		if time.Now().After(deadline) {
 			if err != nil {
@@ -371,8 +423,8 @@ func statusNames(st uint32) []string {
 }
 
 // satIF computes the intermediate frequency, LNB voltage and 22 kHz tone.
-func satIF(t store.Tuning, sat *store.SatInput) (ifreq, voltage, tone uint32) {
-	s := store.SatInput{LNB: "universal", LOFLow: 9750000, LOFHigh: 10600000, Switch: 11700000}
+func satIF(t Tuning, sat *SatInput) (ifreq, voltage, tone uint32) {
+	s := SatInput{LNB: "universal", LOFLow: 9750000, LOFHigh: 10600000, Switch: 11700000}
 	if sat != nil && sat.LNB != "" {
 		s = *sat
 	}
@@ -400,7 +452,7 @@ func satIF(t store.Tuning, sat *store.SatInput) (ifreq, voltage, tone uint32) {
 	return lof - t.FrequencyKHz, voltage, tone
 }
 
-func (fe *Frontend) diseqc(sat *store.SatInput, t store.Tuning, voltage, tone uint32) error {
+func (fe *Frontend) diseqc(sat *SatInput, t Tuning, voltage, tone uint32) error {
 	if sat == nil || sat.DiseqcPort <= 0 {
 		return nil
 	}

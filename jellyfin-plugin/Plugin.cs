@@ -9,7 +9,7 @@ using MediaBrowser.Model.Serialization;
 namespace Jellyfin.Plugin.DvbHub;
 
 /// <summary>
-/// dvbhub plugin: control a dvbhub DVB tuner server from Jellyfin's dashboard.
+/// dvbhub plugin: control a dvbhub TV tuner server from Jellyfin's dashboard.
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
@@ -35,7 +35,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     /// <inheritdoc />
     public override string Description =>
-        "Control your dvbhub DVB tuner server from Jellyfin: tuners with signal bars, scanning, channels, antenna alignment, transcoding and drivers.";
+        "Control your dvbhub TV tuner server from Jellyfin: channel scanning, channels, guide, signal bars, transcoding, tuners, drivers and antenna alignment.";
 
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()

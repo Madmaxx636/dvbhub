@@ -1,59 +1,41 @@
-<div id="dvbhubPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+<div id="dvbhubPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button,emby-input">
 <div data-role="content">
 <div class="content-primary">
 
 <style>
-#dvbhubPage .dh { --dh-line: rgba(128,128,128,.25); --dh-panel: rgba(128,128,128,.08); --dh-good: #2ecc71; --dh-ok: #9bd14a; --dh-warn: #f0b429; --dh-bad: #ff6b6b; --dh-accent: #00a4dc; }
-#dvbhubPage .dh-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
-#dvbhubPage .dh-head h2 { margin:0; }
-#dvbhubPage .dh-conn { font-size:.85em; opacity:.8; }
-#dvbhubPage .dh-tabs { display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--dh-line); margin:10px 0 16px; }
-#dvbhubPage .dh-tabs button { background:none; border:none; color:inherit; padding:10px 14px; cursor:pointer; opacity:.7; border-bottom:2px solid transparent; font:inherit; }
-#dvbhubPage .dh-tabs button.on { opacity:1; border-bottom-color:var(--dh-accent); }
-#dvbhubPage .dh-grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); }
-#dvbhubPage .dh-card { background:var(--dh-panel); border:1px solid var(--dh-line); border-radius:12px; padding:14px; margin-bottom:14px; }
-#dvbhubPage .dh-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-#dvbhubPage .dh-sp { flex:1; }
-#dvbhubPage .dh-muted { opacity:.65; }
-#dvbhubPage .dh-small { font-size:.85em; }
-#dvbhubPage .dh-mono { font-family:monospace; font-size:.85em; word-break:break-all; }
-#dvbhubPage .dh-badge { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.8em; font-weight:600; background:var(--dh-line); white-space:nowrap; }
-#dvbhubPage .dh-good { background:rgba(46,204,113,.2); color:var(--dh-good); }
-#dvbhubPage .dh-warnb { background:rgba(240,180,41,.2); color:var(--dh-warn); }
-#dvbhubPage .dh-badb { background:rgba(255,107,107,.2); color:var(--dh-bad); }
-#dvbhubPage .dh-acc { background:rgba(0,164,220,.2); color:var(--dh-accent); }
-#dvbhubPage .dh-big { font-size:2em; font-weight:700; font-variant-numeric:tabular-nums; }
-#dvbhubPage .dh-huge { font-size:4.2em; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
-#dvbhubPage .dh-bar { height:8px; border-radius:99px; background:var(--dh-line); overflow:hidden; margin-top:4px; }
-#dvbhubPage .dh-bar i { display:block; height:100%; border-radius:99px; transition:width .3s; }
-#dvbhubPage table.dh-t { width:100%; border-collapse:collapse; }
-#dvbhubPage table.dh-t th, #dvbhubPage table.dh-t td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--dh-line); vertical-align:middle; }
-#dvbhubPage table.dh-t th { font-size:.8em; opacity:.7; }
-#dvbhubPage .dh-wrap { overflow-x:auto; }
-#dvbhubPage .dh-btn { font:inherit; font-size:.9em; padding:6px 12px; border-radius:6px; border:1px solid var(--dh-line); background:var(--dh-panel); color:inherit; cursor:pointer; }
-#dvbhubPage .dh-btn.pri { background:var(--dh-accent); border-color:var(--dh-accent); color:#fff; }
-#dvbhubPage .dh-btn.red { color:var(--dh-bad); }
-#dvbhubPage .dh-in { font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--dh-line); background:rgba(0,0,0,.15); color:inherit; }
-#dvbhubPage .dh-lock { font-weight:800; font-size:1.3em; padding:6px 14px; border-radius:10px; }
-#dvbhubPage pre.dh-log { background:rgba(0,0,0,.25); padding:10px; border-radius:8px; max-height:340px; overflow:auto; white-space:pre-wrap; font-size:.8em; }
-#dvbhubPage .dh-sub { display:flex; gap:8px; align-items:center; padding:5px 0; border-top:1px solid var(--dh-line); font-size:.9em; }
-#dvbhubPage .dh-err { background:rgba(255,107,107,.15); color:var(--dh-bad); padding:10px 12px; border-radius:8px; margin-bottom:12px; }
-#dvbhubPage .dh-live { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--dh-good); margin-left:6px; }
-#dvbhubPage label.dh-f { display:flex; flex-direction:column; gap:4px; font-size:.8em; opacity:.9; }
-#dvbhubPage .dh-form { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); align-items:end; }
+#dvbhubPage .dhp-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 6px; padding:0 16px; }
+#dvbhubPage .dhp-bar h2 { margin:0; }
+#dvbhubPage .dhp-sp { flex:1; }
+#dvbhubPage .dhp-state { font-size:.85em; opacity:.8; }
+#dvbhubPage .dhp-btn { font:inherit; font-size:.9em; padding:6px 12px; border-radius:6px; border:1px solid rgba(128,128,128,.35); background:rgba(128,128,128,.12); color:inherit; cursor:pointer; text-decoration:none; }
+#dvbhubPage .dhp-btn.pri { background:#00a4dc; border-color:#00a4dc; color:#fff; }
+#dvbhubPage .dhp-conn { margin:0 16px 14px; padding:14px; border-radius:10px; background:rgba(128,128,128,.09); border:1px solid rgba(128,128,128,.28); }
+#dvbhubPage .dhp-conn label { display:flex; flex-direction:column; gap:4px; font-size:.85em; font-weight:600; flex:1; min-width:220px; }
+#dvbhubPage .dhp-conn input { font:inherit; font-weight:400; color:inherit; background:rgba(0,0,0,.18); border:1px solid rgba(128,128,128,.35); border-radius:6px; padding:7px 9px; }
+#dvbhubPage .dhp-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+#dvbhubPage .dhp-note { font-size:.85em; opacity:.75; margin:8px 0 0; }
+#dvbhubPage .dhp-err { color:#ff6b6b; }
 </style>
 
-<div class="dh">
-  <div class="dh-head">
-    <h2>TV Tuners</h2>
-    <span class="dh-conn" id="dhConn"></span>
-    <span class="dh-sp"></span>
-    <a class="dh-btn" id="dhOpenFull" target="_blank" rel="noopener">Open full dvbhub UI ↗</a>
-  </div>
-  <div class="dh-tabs" id="dhTabs"></div>
-  <div id="dhErr"></div>
-  <div id="dhView"></div>
+<div class="dhp-bar">
+  <h2>TV Tuners</h2>
+  <span class="dhp-state" id="dhpState"></span>
+  <span class="dhp-sp"></span>
+  <a class="dhp-btn" id="dhpOpen" target="_blank" rel="noopener" style="display:none">Open dvbhub ↗</a>
+  <button class="dhp-btn" id="dhpConnBtn" type="button">Connection</button>
 </div>
+
+<div class="dhp-conn" id="dhpConn" style="display:none">
+  <div class="dhp-row">
+    <label>dvbhub address<input id="dhpUrl" type="url" placeholder="http://192.168.1.10:9980" autocomplete="off"></label>
+    <label>dvbhub password<input id="dhpPw" type="password" placeholder="(none)" autocomplete="new-password"></label>
+    <button class="dhp-btn pri" id="dhpSave" type="button">Save and connect</button>
+  </div>
+  <p class="dhp-note">The address of dvbhub as the Jellyfin server sees it: usually the server's IP address and port 9980. The password is only needed if you gave dvbhub one.</p>
+  <p class="dhp-note" id="dhpResult"></p>
+</div>
+
+<div id="dhpMount"></div>
 
 </div>
 </div>
@@ -62,449 +44,142 @@
 (function () {
     var pluginId = '7b1e4c2a-5d3f-4e8b-9a61-2c0f8d9e4b17';
     var page = document.querySelector('#dvbhubPage');
-    var config = null, timer = null, cleanup = null, currentTab = 'overview';
+    var config = null, app = null;
 
-    // ---------- helpers ----------
-    function h(tag, attrs) {
-        var el = document.createElement(tag);
-        attrs = attrs || {};
-        Object.keys(attrs).forEach(function (k) {
-            var v = attrs[k];
-            if (v === undefined || v === null || v === false) return;
-            if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), v);
-            else if (k === 'class') el.className = v;
-            else if (k === 'value') el.value = v;
-            else if (k === 'checked') el.checked = !!v;
-            else el.setAttribute(k, v === true ? '' : v);
-        });
-        for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
-        return el;
-    }
-    function add(el, k) {
-        if (k === undefined || k === null || k === false) return;
-        if (Array.isArray(k)) { k.forEach(function (x) { add(el, x); }); return; }
-        el.appendChild(k instanceof Node ? k : document.createTextNode(String(k)));
-    }
-    // Like el.replaceChildren(...) but skips null/false entries and flattens arrays.
-    function fill(el) {
-        el.replaceChildren();
-        for (var i = 1; i < arguments.length; i++) add(el, arguments[i]);
-        return el;
-    }
-    var NS = 'http://www.w3.org/2000/svg';
-    function svg(tag, attrs) { var el = document.createElementNS(NS, tag); Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); }); return el; }
     function $(sel) { return page.querySelector(sel); }
-    function toast(msg) { if (window.Dashboard && Dashboard.alert) Dashboard.alert(msg); else alert(msg); }
-    function fmtKbps(k) { return k >= 1000 ? (k / 1000).toFixed(1) + ' Mbit/s' : Math.round(k || 0) + ' kbit/s'; }
-    function fmtBytes(b) { var u = ['B', 'KB', 'MB', 'GB']; var i = 0; while (b >= 1024 && i < 3) { b /= 1024; i++; } return b.toFixed(i ? 1 : 0) + ' ' + u[i]; }
-    function fmtDate(d) { return new Date(d).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }); }
-    function fmtTime(d) { return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
-    function levelColor(pct) { return pct < 0 ? 'var(--dh-line)' : pct < 35 ? 'var(--dh-bad)' : pct < 55 ? 'var(--dh-warn)' : pct < 70 ? 'var(--dh-ok)' : 'var(--dh-good)'; }
-    function score(sg) { return sg.snrDb != null ? sg.snrDb * 100 / 30 : (sg.snrPct >= 0 ? sg.snrPct : sg.strengthPct); }
-
-    // All dvbhub calls go through Jellyfin (admin only): /DvbHub/Api/<path>.
-    function api(method, path, body) {
-        var opts = { method: method, headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' } };
-        if (body !== undefined) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
+    function authHeaders(extra) {
+        var hd = { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' };
+        Object.keys(extra || {}).forEach(function (k) { hd[k] = extra[k]; });
+        return hd;
+    }
+    function call(method, path, body) {
+        var opts = { method: method, headers: authHeaders() };
+        if (body !== undefined && method !== 'GET') {
+            if (typeof body === 'string') { opts.body = body; opts.headers['Content-Type'] = 'text/plain'; }
+            else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
+        }
         return fetch(ApiClient.getUrl('DvbHub/Api/' + path), opts).then(function (r) {
             return r.text().then(function (t) {
-                var d = null; try { d = t ? JSON.parse(t) : null; } catch (e) { d = t; }
+                var d = null;
+                try { d = t ? JSON.parse(t) : null; } catch (e) { d = t; }
                 if (!r.ok) throw new Error((d && d.error) || t || r.statusText);
                 return d;
             });
         });
     }
-    function get(path) { return api('GET', path); }
-    function act(p, okMsg) {
-        return p.then(function (r) { if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg); return r; })
-            .catch(function (e) { toast('Error: ' + e.message); throw e; });
-    }
-    function showErr(e) {
-        fill($('#dhErr'), e ? h('div', { class: 'dh-err' }, e.message || String(e), ' — check the Setup tab.') : null);
-    }
-
-    // Phone-style bars from a signal snapshot {bars, locked, snrDb, strengthPct, live}.
-    function bars(snap, size) {
-        size = size || 18;
-        var n = snap ? snap.bars : -1;
-        var col = n <= 1 ? 'var(--dh-bad)' : n === 2 ? 'var(--dh-warn)' : n === 3 ? 'var(--dh-ok)' : 'var(--dh-good)';
-        var s = svg('svg', { viewBox: '0 0 20 16', width: size * 1.25, height: size });
-        for (var i = 0; i < 4; i++) s.appendChild(svg('rect', { x: i * 5, y: 12 - i * 4, width: 3.6, height: 4 + i * 4, rx: 1, fill: snap && i < n ? col : 'var(--dh-line)' }));
-        var label = !snap ? '–' : snap.snrDb != null ? snap.snrDb.toFixed(1) + ' dB' : snap.locked ? (snap.quality || '') : 'no lock';
-        var title = !snap ? 'no reading yet' : [snap.locked ? 'locked' : 'no lock', snap.strengthPct >= 0 ? 'strength ' + Math.round(snap.strengthPct) + '%' : '', snap.live ? 'live' : (snap.at ? 'measured ' + fmtDate(snap.at) : '')].filter(Boolean).join(' · ');
-        return h('span', { class: 'dh-row', style: 'gap:4px;display:inline-flex', title: title }, s, h('span', { class: 'dh-small' + (snap && snap.live ? '' : ' dh-muted') }, label), snap && snap.live ? h('span', { class: 'dh-live' }) : null);
-    }
-
-    // ---------- tabs ----------
-    var tabs = [['overview', 'Overview'], ['channels', 'Channels'], ['scan', 'Scan'], ['align', 'Align'], ['transcode', 'Transcoding'], ['hardware', 'Hardware'], ['setup', 'Setup']];
-    function renderTabs() {
-        $('#dhTabs').replaceChildren.apply($('#dhTabs'), tabs.map(function (t) {
-            return h('button', { class: t[0] === currentTab ? 'on' : '', onclick: function () { show(t[0]); } }, t[1]);
-        }));
-    }
-    function show(tab) {
-        currentTab = tab;
-        clearInterval(timer); timer = null;
-        if (cleanup) { try { cleanup(); } catch (e) { } cleanup = null; }
-        renderTabs();
-        fill($('#dhView'),h('div', { class: 'dh-muted' }, 'Loading…'));
-        Promise.resolve(views[tab]()).then(function () { showErr(null); }).catch(function (e) { showErr(e); fill($('#dhView'),); });
-    }
-    function every(ms, fn) { clearInterval(timer); fn(); timer = setInterval(fn, ms); }
-
-    var views = {};
-
-    // ---------- overview ----------
-    views.overview = function () {
-        var grid = h('div', { class: 'dh-grid' });
-        var sum = h('div', { class: 'dh-small dh-muted', style: 'margin-bottom:10px' });
-        fill($('#dhView'),sum, grid);
-        return new Promise(function (resolve, reject) {
-            var first = true;
-            every(2000, function () {
-                get('status?history=0').then(function (st) {
-                    var c = st.counts;
-                    sum.textContent = c.channels + ' channels · ' + c.services + ' services · ' + c.muxes + ' muxes · ' + st.epg.events + ' guide events';
-                    grid.replaceChildren.apply(grid, (st.tuners || []).map(tunerCard));
-                    if (!st.tuners || !st.tuners.length) grid.replaceChildren(h('div', { class: 'dh-card dh-muted' }, 'No tuners found. Open the Hardware tab to diagnose drivers.'));
-                    showErr(null);
-                    if (first) { first = false; resolve(); }
-                }).catch(function (e) { if (first) { first = false; reject(e); } else showErr(e); });
+    function fetchText(path) {
+        return fetch(ApiClient.getUrl(path), { headers: authHeaders() }).then(function (r) {
+            return r.text().then(function (t) {
+                if (!r.ok) { var m = t; try { m = JSON.parse(t).error || t; } catch (e) { } throw new Error(m || r.statusText); }
+                return t;
             });
         });
-    };
-    function tunerCard(t) {
-        var sg = t.signal || {}, idle = t.state === 'idle';
-        var q = idle ? 'idle' : t.quality;
-        var qc = { excellent: 'dh-good', good: 'dh-good', fair: 'dh-warnb', poor: 'dh-badb', 'no-lock': 'dh-badb' }[q] || '';
-        var card = h('div', { class: 'dh-card' },
-            h('div', { class: 'dh-row' },
-                h('div', {}, h('b', {}, t.config.name || t.name), ' ', h('span', { class: 'dh-muted dh-small' }, t.key),
-                    h('div', { class: 'dh-small dh-muted' }, idle ? (t.config.enabled ? 'Idle' : 'Disabled') : t.mux)),
-                h('span', { class: 'dh-sp' }),
-                idle ? null : bars({ bars: t.bars, locked: sg.locked, snrDb: sg.snrDb, strengthPct: sg.strengthPct, live: true }, 24),
-                h('span', { class: 'dh-badge ' + qc }, q)),
-            t.hold === 'held' ? h('div', { class: 'dh-small', style: 'margin-top:6px' }, h('span', { class: 'dh-badge dh-good' }, '🔒 held by dvbhub')) : null,
-            t.hold && t.hold.indexOf('blocked') === 0 ? h('div', { class: 'dh-small', style: 'margin-top:6px' }, h('span', { class: 'dh-badge dh-badb' }, '⚠ ' + t.hold)) : null,
-            (t.users || []).length ? h('div', { class: 'dh-small', style: 'margin-top:6px' }, h('span', { class: 'dh-badge dh-warnb' }, 'also open in: ' + t.users.map(function (u) { return u.name + ' (' + u.pid + ')'; }).join(', '))) : null);
-        if (!idle) {
-            var snrPct = sg.snrDb != null ? sg.snrDb * 100 / 30 : sg.snrPct;
-            card.appendChild(h('div', { class: 'dh-row', style: 'margin-top:12px;gap:24px' },
-                h('div', { style: 'flex:1' }, h('div', { class: 'dh-small dh-muted' }, 'Strength'),
-                    h('div', { class: 'dh-big' }, sg.strengthPct >= 0 ? Math.round(sg.strengthPct) + '%' : '–'),
-                    h('div', { class: 'dh-bar' }, h('i', { style: 'width:' + Math.max(0, sg.strengthPct) + '%;background:' + levelColor(sg.strengthPct) }))),
-                h('div', { style: 'flex:1' }, h('div', { class: 'dh-small dh-muted' }, 'Quality (SNR)'),
-                    h('div', { class: 'dh-big' }, sg.snrDb != null ? sg.snrDb.toFixed(1) + ' dB' : (sg.snrPct >= 0 ? Math.round(sg.snrPct) + '%' : '–')),
-                    h('div', { class: 'dh-bar' }, h('i', { style: 'width:' + Math.max(0, snrPct) + '%;background:' + levelColor(snrPct) })))));
-            card.appendChild(h('div', { class: 'dh-small dh-muted', style: 'margin-top:8px' },
-                'Errors: ' + (sg.unc || 0) + ' uncorrected · ' + (t.ccErrors + t.teiErrors) + ' stream · ' + fmtKbps(t.kbps)));
-            if (t.state === 'nosignal') card.appendChild(h('div', { class: 'dh-err', style: 'margin:8px 0 0' }, 'Signal lost ' + Math.round(t.outageSeconds) + ' s — viewers kept connected, re-tuned ' + t.retunes + '×'));
-            (t.subscriptions || []).forEach(function (s) {
-                var tx = s.transcode;
-                card.appendChild(h('div', { class: 'dh-sub' },
-                    h('span', { class: 'dh-badge dh-acc' }, s.weight >= 100 ? 'Live' : s.weight >= 10 ? 'Scan' : 'EPG'),
-                    h('div', { style: 'flex:1' }, h('b', {}, s.service || s.name), ' → ', s.client || s.name,
-                        h('div', { class: 'dh-small dh-muted' }, (s.profile || 'raw') + ' · ' + fmtBytes(s.bytesOut) + (tx ? ' · ' + tx.encoder + ' ' + fmtKbps(tx.outKbps) + ' / target ' + fmtKbps(tx.targetKbps) : '') + (s.failovers ? ' · ' + s.failovers + ' failover(s)' : ''))),
-                    h('button', { class: 'dh-btn red', title: 'Stop', onclick: function () { act(api('DELETE', 'subscriptions/' + s.id), 'Stopped'); } }, '✕')));
-            });
-        }
-        return card;
     }
+    function norm(u) { return String(u || '').trim().replace(/\/+$/, '').toLowerCase(); }
 
-    // ---------- channels ----------
-    views.channels = function () {
-        return Promise.all([get('channels'), get('profiles')]).then(function (res) {
-            var chans = res[0] || [], profs = res[1] || [];
-            var q = h('input', { class: 'dh-in', placeholder: 'Filter channels…', style: 'min-width:220px' });
-            var tbody = h('tbody');
-            function render() {
-                var f = q.value.toLowerCase();
-                tbody.replaceChildren.apply(tbody, chans.filter(function (c) { return !f || c.name.toLowerCase().indexOf(f) >= 0 || String(c.number) === f; }).map(function (c) {
-                    var num = h('input', { class: 'dh-in', type: 'number', value: c.number, style: 'width:70px' });
-                    var name = h('input', { class: 'dh-in', value: c.name, style: 'width:170px' });
-                    var en = h('input', { type: 'checkbox', checked: c.enabled });
-                    var prof = h('select', { class: 'dh-in' }, h('option', { value: '' }, 'Default'), profs.map(function (p) { return h('option', { value: p.id, selected: p.id === c.profile }, p.name); }));
-                    return h('tr', {},
-                        h('td', {}, num), h('td', {}, name, c.now ? h('div', { class: 'dh-small dh-muted' }, 'Now: ' + c.now.title + ' (' + fmtTime(c.now.start) + ')') : null),
-                        h('td', {}, bars(c.signal)), h('td', {}, en),
-                        h('td', { class: 'dh-small' }, (c.serviceNames || []).map(function (n, i) { return h('div', {}, h('span', { class: 'dh-badge' + (i ? '' : ' dh-acc') }, i ? 'backup' : 'primary'), ' ', n); })),
-                        h('td', {}, prof),
-                        h('td', {}, h('button', { class: 'dh-btn pri', onclick: function () {
-                            var body = Object.assign({}, c, { number: +num.value, name: name.value, enabled: en.checked, profile: prof.value });
-                            ['serviceNames', 'now', 'next', 'streamUrl', 'signal'].forEach(function (k) { delete body[k]; });
-                            act(api('PUT', 'channels/' + c.id, body), 'Saved');
-                        } }, 'Save')));
-                }));
-            }
-            q.addEventListener('input', render);
-            render();
-            fill($('#dhView'),
-                h('div', { class: 'dh-row', style: 'margin-bottom:10px' }, q, h('span', { class: 'dh-sp' }),
-                    h('button', { class: 'dh-btn', onclick: function () { act(api('POST', 'epg/automap'), function (r) { return 'Matched ' + r.mapped + ' channels to XMLTV'; }); } }, 'Auto-match XMLTV guide')),
-                h('div', { class: 'dh-card dh-wrap', style: 'padding:0' }, h('table', { class: 'dh-t' },
-                    h('thead', {}, h('tr', {}, ['#', 'Name', 'Signal', 'On', 'Sources', 'Profile', ''].map(function (x) { return h('th', {}, x); }))), tbody)),
-                chans.length ? null : h('div', { class: 'dh-card dh-muted' }, 'No channels yet — scan on the Scan tab, then "Map all services".'));
-        });
-    };
-
-    // ---------- scan ----------
-    views.scan = function () {
-        return Promise.all([get('networks'), get('muxes'), get('scanfiles').catch(function () { return []; }), get('status?history=0')]).then(function (res) {
-            var nets = res[0] || [], muxes = res[1] || [], files = res[2] || [], st = res[3];
-            var view = $('#dhView');
-            var scanning = (st.scan.active || []).length + (st.scan.queued || []).length;
-            var nName = h('input', { class: 'dh-in', placeholder: 'e.g. Freeview' });
-            var nType = h('select', { class: 'dh-in' }, [['dvbt', 'DVB-T/T2 (antenna)'], ['dvbc', 'DVB-C (cable)'], ['dvbs', 'DVB-S/S2 (satellite)'], ['atsc', 'ATSC']].map(function (o) { return h('option', { value: o[0] }, o[1]); }));
-            var optRadio = h('input', { type: 'checkbox' }), optFTA = h('input', { type: 'checkbox', checked: true });
-            fill(view,
-                scanning ? h('div', { class: 'dh-card' }, h('b', {}, 'Scanning… '), (st.scan.active || []).length + ' active, ' + (st.scan.queued || []).length + ' queued (refreshes automatically)') : null,
-                h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Add a network'),
-                    h('div', { class: 'dh-form' }, h('label', { class: 'dh-f' }, 'Name', nName), h('label', { class: 'dh-f' }, 'Type', nType),
-                        h('button', { class: 'dh-btn pri', onclick: function () { act(api('POST', 'networks', { name: nName.value, type: nType.value, discoverMuxes: true }), 'Network added').then(function () { show('scan'); }); } }, 'Add'))),
-                h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Create channels'),
-                    h('div', { class: 'dh-row' }, h('label', { class: 'dh-row dh-small' }, optRadio, 'Include radio'), h('label', { class: 'dh-row dh-small' }, optFTA, 'Skip scrambled'),
-                        h('button', { class: 'dh-btn pri', onclick: function () {
-                            act(api('POST', 'map', { includeRadio: optRadio.checked, skipScrambled: optFTA.checked, mergeByName: true }), function (r) { return 'Created ' + r.created + ' channels, ' + r.merged + ' backups'; });
-                        } }, 'Map all services'))));
-            nets.forEach(function (n) {
-                var mine = muxes.filter(function (m) { return m.networkId === n.id; });
-                var fileSel = h('select', { class: 'dh-in', style: 'max-width:320px' }, h('option', { value: '' }, 'Import a scan table…'),
-                    files.filter(function (f) { return f.indexOf('/' + ({ dvbt: 'dvb-t', dvbc: 'dvb-c', dvbs: 'dvb-s', atsc: 'atsc' }[n.type]) + '/') >= 0; })
-                        .map(function (f) { return h('option', { value: f }, f.split('/').pop()); }));
-                fileSel.addEventListener('change', function () {
-                    if (!fileSel.value) return;
-                    fetch(ApiClient.getUrl('DvbHub/Api/scanfile', { path: fileSel.value }), { headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' } })
-                        .then(function (r) { return r.text(); })
-                        .then(function (txt) { return fetch(ApiClient.getUrl('DvbHub/Api/networks/' + n.id + '/import'), { method: 'POST', body: txt, headers: { 'Content-Type': 'text/plain', 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' } }); })
-                        .then(function (r) { return r.json(); })
-                        .then(function (r) { toast('Imported ' + r.added + ' muxes; scanning'); show('scan'); });
-                });
-                view.appendChild(h('div', { class: 'dh-card' },
-                    h('div', { class: 'dh-row' }, h('h3', { style: 'margin:0' }, n.name), h('span', { class: 'dh-badge' }, n.type), h('span', { class: 'dh-small dh-muted' }, n.muxes + ' muxes · ' + n.services + ' services'), h('span', { class: 'dh-sp' }),
-                        n.type !== 'virtual' ? fileSel : null,
-                        h('button', { class: 'dh-btn pri', onclick: function () { act(api('POST', 'networks/' + n.id + '/scan'), function (r) { return 'Scanning ' + r.queued + ' muxes'; }).then(function () { show('scan'); }); } }, 'Scan all')),
-                    h('div', { class: 'dh-wrap' }, h('table', { class: 'dh-t', style: 'margin-top:8px' },
-                        h('tr', {}, ['Mux', 'Signal', 'Services', 'Scan', ''].map(function (x) { return h('th', {}, x); })),
-                        mine.map(function (m) {
-                            var sc = { ok: 'dh-good', fail: 'dh-badb', scanning: 'dh-acc', pending: 'dh-warnb' }[m.scanStatus] || '';
-                            return h('tr', {}, h('td', {}, m.label), h('td', {}, bars(m.signal)), h('td', {}, m.services),
-                                h('td', {}, h('span', { class: 'dh-badge ' + sc }, m.scanStatus || 'new'), m.scanError ? h('div', { class: 'dh-small dh-muted' }, m.scanError) : null),
-                                h('td', {}, h('button', { class: 'dh-btn', onclick: function () { act(api('POST', 'muxes/' + m.id + '/scan'), 'Scan queued'); } }, 'Scan')));
-                        })))));
-            });
-            if (scanning) timer = setTimeout(function () { if (currentTab === 'scan') show('scan'); }, 3000);
-        });
-    };
-
-    // ---------- align ----------
-    views.align = function () {
-        return Promise.all([get('tuners'), get('muxes')]).then(function (res) {
-            var tuners = (res[0] || []).filter(function (t) { return t.config.enabled; }), muxes = res[1] || [];
-            var tSel = h('select', { class: 'dh-in' }, tuners.map(function (t) { return h('option', { value: t.key }, (t.config.name || t.name) + ' (' + t.key + ')'); }));
-            var mSel = h('select', { class: 'dh-in' }, muxes.map(function (m) { return h('option', { value: m.id }, m.network + ': ' + m.label); }));
-            var toneBox = h('input', { type: 'checkbox' });
-            var out = h('div', {});
-            var poll = null, key = '', peak = -1, hist = [], audio = null, osc = null, gain = null;
-            function stopAudio() { try { if (osc) osc.stop(); if (audio) audio.close(); } catch (e) { } audio = osc = gain = null; }
-            function tone(sc, locked) {
-                if (!toneBox.checked) { stopAudio(); return; }
-                if (!audio) { audio = new (window.AudioContext || window.webkitAudioContext)(); osc = audio.createOscillator(); gain = audio.createGain(); osc.connect(gain); gain.connect(audio.destination); gain.gain.value = 0; osc.start(); }
-                osc.frequency.setTargetAtTime(220 + Math.max(0, sc) * 8, audio.currentTime, 0.05);
-                gain.gain.setTargetAtTime(locked ? 0.15 : 0, audio.currentTime, 0.05);
-            }
-            function stop() { clearInterval(poll); poll = null; stopAudio(); if (key) api('DELETE', 'align?tuner=' + encodeURIComponent(key)).catch(function () { }); }
-            cleanup = stop;
-            function tick() {
-                get('align?tuner=' + encodeURIComponent(key)).then(function (d) {
-                    var sg = d.signal || {}, sc = score(sg);
-                    hist.push({ s: sc, l: sg.locked }); if (hist.length > 240) hist.shift();
-                    if (sg.locked && sc > peak) peak = sc;
-                    tone(sc, sg.locked);
-                    var W = 600, H = 70, sp = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', style: 'width:100%;height:70px;display:block;margin-top:12px' });
-                    sp.appendChild(svg('polyline', { fill: 'none', stroke: 'var(--dh-accent)', 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke',
-                        points: hist.map(function (p, i) { return (i * W / 240) + ',' + (H - Math.max(0, Math.min(100, p.s)) * H / 100); }).join(' ') }));
-                    fill(out,h('div', { class: 'dh-card' },
-                        h('div', { class: 'dh-row' }, h('span', { class: 'dh-lock ' + (sg.locked ? 'dh-good' : 'dh-badb') }, sg.locked ? '● LOCKED' : '○ NO LOCK'), h('span', { class: 'dh-muted' }, d.mux || ''), h('span', { class: 'dh-sp' }), bars({ bars: d.bars, locked: sg.locked, snrDb: sg.snrDb, strengthPct: sg.strengthPct, live: true }, 44)),
-                        h('div', { class: 'dh-row', style: 'margin-top:14px;gap:30px;align-items:flex-end' },
-                            h('div', {}, h('div', { class: 'dh-small dh-muted' }, 'SNR'), h('div', { class: 'dh-huge' }, sg.snrDb != null ? sg.snrDb.toFixed(1) : (sg.snrPct >= 0 ? Math.round(sg.snrPct) : '–'), h('span', { class: 'dh-small' }, sg.snrDb != null ? ' dB' : ' %'))),
-                            h('div', { style: 'flex:1;min-width:200px' },
-                                h('div', { class: 'dh-small dh-muted' }, 'Quality ' + Math.round(Math.max(0, sc)) + '%' + (peak >= 0 ? ' · peak ' + Math.round(peak) + '%' : '')),
-                                h('div', { class: 'dh-bar', style: 'height:20px' }, h('i', { style: 'width:' + Math.max(0, Math.min(100, sc)) + '%;background:' + levelColor(sc) })),
-                                h('div', { class: 'dh-small dh-muted', style: 'margin-top:8px' }, 'Strength ' + (sg.strengthPct >= 0 ? Math.round(sg.strengthPct) + '%' : '–') + (sg.strengthDbm != null ? ' (' + sg.strengthDbm.toFixed(1) + ' dBm)' : '')),
-                                h('div', { class: 'dh-bar' }, h('i', { style: 'width:' + Math.max(0, sg.strengthPct) + '%;background:gray' })))),
-                        sp));
-                }).catch(function () { });
-            }
-            fill($('#dhView'),
-                h('div', { class: 'dh-card' },
-                    h('div', { class: 'dh-small dh-muted', style: 'margin-bottom:10px' }, 'Holds one tuner on one mux and reads the signal 4× a second. Adjust the antenna or dish for the highest SNR. With the tone on, the pitch rises as quality improves and goes silent without lock.'),
-                    h('div', { class: 'dh-form' }, h('label', { class: 'dh-f' }, 'Tuner', tSel), h('label', { class: 'dh-f' }, 'Mux', mSel), h('label', { class: 'dh-row' }, toneBox, '🔊 Tone'),
-                        h('div', { class: 'dh-row' },
-                            h('button', { class: 'dh-btn pri', onclick: function () {
-                                stop(); key = tSel.value; peak = -1; hist = [];
-                                act(api('POST', 'align', { tuner: key, muxId: mSel.value })).then(function () { poll = setInterval(tick, 250); });
-                            } }, 'Start'),
-                            h('button', { class: 'dh-btn', onclick: function () { stop(); fill(out,); } }, 'Stop')))),
-                out);
-        });
-    };
-
-    // ---------- transcoding ----------
-    views.transcode = function () {
-        return Promise.all([get('profiles'), get('settings'), get('system')]).then(function (res) {
-            var profs = res[0] || [], set = res[1], sys = res[2].transcode;
-            var def = h('select', { class: 'dh-in' }, profs.map(function (p) { return h('option', { value: p.id, selected: p.id === set.hdhrProfile }, p.name); }));
-            var view = $('#dhView');
-            fill(view,
-                h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Hardware'),
-                    h('div', { class: 'dh-small' }, sys.ffmpegOk ? sys.version : 'ffmpeg not found'),
-                    h('div', { class: 'dh-row', style: 'margin-top:6px' }, (sys.encoders || []).map(function (e) { return h('span', { class: 'dh-badge' + (e.indexOf('nvenc') >= 0 ? ' dh-good' : '') }, e); })),
-                    (sys.gpus || []).map(function (g) { return h('div', { class: 'dh-small', style: 'margin-top:6px' }, h('b', {}, g.name), ' · encoder ' + g.encUtil + '% · decoder ' + g.decUtil + '% · ' + g.tempC + '°C'); }),
-                    !(sys.gpus || []).length ? h('div', { class: 'dh-small dh-muted' }, sys.smiError || 'No NVIDIA GPU detected') : null),
-                h('div', { class: 'dh-card' }, h('div', { class: 'dh-row' }, h('b', {}, 'Default profile for Jellyfin'), def,
-                    h('button', { class: 'dh-btn pri', onclick: function () { act(api('PUT', 'settings', Object.assign({}, set, { hdhrProfile: def.value })), 'Saved'); } }, 'Save'))));
-            profs.forEach(function (p) {
-                var card = h('div', { class: 'dh-card' });
-                var f = {
-                    rc: h('select', { class: 'dh-in' }, [['vbr', 'VBR'], ['cbr', 'CBR'], ['cq', 'Constant quality']].map(function (o) { return h('option', { value: o[0], selected: o[0] === (p.rateControl || 'vbr') }, o[1]); })),
-                    br: h('input', { class: 'dh-in', type: 'number', value: p.bitrate }), mr: h('input', { class: 'dh-in', type: 'number', value: p.maxrate }),
-                    ht: h('select', { class: 'dh-in' }, [[0, 'Source'], [2160, '2160p'], [1080, '1080p'], [720, '720p'], [576, '576p'], [480, '480p']].map(function (o) { return h('option', { value: o[0], selected: o[0] === p.height }, o[1]); })),
-                    ab: h('input', { class: 'dh-in', type: 'number', value: p.audioBitrate })
-                };
-                var lineup = (config.DvbHubUrl || '').replace(/\/$/, '') + (p.id === set.hdhrProfile ? '' : '/p/' + p.id);
-                card.appendChild(h('div', { class: 'dh-row' }, h('b', {}, p.name), h('span', { class: 'dh-badge' + (p.videoCodec.indexOf('nvenc') >= 0 ? ' dh-good' : '') }, p.passthrough ? 'passthrough' : p.videoCodec),
-                    p.id === set.hdhrProfile ? h('span', { class: 'dh-badge dh-acc' }, 'default') : null, h('span', { class: 'dh-sp' }),
-                    h('button', { class: 'dh-btn', title: 'Add this profile to Jellyfin as its own HDHomeRun tuner', onclick: function () { addTuner(lineup, p.name); } }, '+ Add as Jellyfin tuner')));
-                if (!p.passthrough && p.videoCodec !== 'copy') {
-                    card.appendChild(h('div', { class: 'dh-form', style: 'margin-top:10px' },
-                        h('label', { class: 'dh-f' }, 'Rate control', f.rc), h('label', { class: 'dh-f' }, 'Bitrate kbit/s', f.br), h('label', { class: 'dh-f' }, 'Peak kbit/s', f.mr),
-                        h('label', { class: 'dh-f' }, 'Resolution', f.ht), h('label', { class: 'dh-f' }, 'Audio kbit/s', f.ab),
-                        h('button', { class: 'dh-btn pri', onclick: function () {
-                            var body = Object.assign({}, p, { rateControl: f.rc.value, bitrate: +f.br.value, maxrate: +f.mr.value, height: +f.ht.value, audioBitrate: +f.ab.value });
-                            delete body.command; delete body.passthrough;
-                            act(api('PUT', 'profiles/' + p.id, body), 'Profile saved');
-                        } }, 'Save')));
+    // Jellyfin's own Live TV API: add dvbhub as an HDHomeRun tuner plus its XMLTV guide.
+    var jellyfin = {
+        addToLiveTv: function (url, xmltv, name) {
+            return ApiClient.getNamedConfiguration('livetv').then(function (lt) {
+                var hosts = lt.TunerHosts || [], provs = lt.ListingProviders || [], jobs = [], did = [];
+                if (!hosts.some(function (x) { return norm(x.Url) === norm(url); })) {
+                    jobs.push(ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('LiveTv/TunerHosts'), contentType: 'application/json',
+                        data: JSON.stringify({ Type: 'hdhomerun', Url: url, FriendlyName: name || 'dvbhub', ImportFavoritesOnly: false, AllowHWTranscoding: true,
+                            AllowStreamSharing: true, EnableStreamLooping: false, IgnoreDts: true, TunerCount: 0 }) }));
+                    did.push('tuner');
                 }
-                card.appendChild(h('div', { class: 'dh-small dh-muted', style: 'margin-top:8px' }, 'Tuner URL: ', h('span', { class: 'dh-mono' }, lineup)));
-                view.appendChild(card);
+                if (!provs.some(function (x) { return x.Type === 'xmltv' && norm(x.Path) === norm(xmltv); })) {
+                    jobs.push(ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('LiveTv/ListingProviders', { validateListings: false, validateLogin: false }), contentType: 'application/json',
+                        data: JSON.stringify({ Type: 'xmltv', Path: xmltv, EnableAllTuners: true }) }));
+                    did.push('guide');
+                }
+                if (!jobs.length) return 'Already in Jellyfin Live TV.';
+                return Promise.all(jobs).then(function () {
+                    return 'Added the ' + did.join(' and ') + ' to Jellyfin Live TV. Channels appear under Live TV in a minute or two.';
+                });
             });
-        });
+        },
+        status: function (url) {
+            return ApiClient.getNamedConfiguration('livetv').then(function (lt) {
+                var on = (lt.TunerHosts || []).some(function (x) { return norm(x.Url) === norm(url); });
+                return on ? 'dvbhub is in Jellyfin Live TV.' : 'Not added to Live TV yet.';
+            });
+        }
     };
 
-    // ---------- hardware ----------
-    views.hardware = function (refresh) {
-        return get('hardware' + (refresh ? '?refresh=1' : '')).then(function (d) {
-            var r = d.report, inst = d.installer;
-            var stBadge = function (s) { return h('span', { class: 'dh-badge ' + ({ working: 'dh-good', 'no-adapter': 'dh-warnb', 'no-driver': 'dh-badb' }[s] || '') }, { working: 'working', 'no-adapter': 'no adapter', 'no-driver': 'no driver' }[s] || s); };
-            var view = $('#dhView');
-            fill(view,
-                h('div', { class: 'dh-card' }, h('div', { class: 'dh-row' }, h('h3', { style: 'margin:0' }, r.summary), h('span', { class: 'dh-sp' }), h('button', { class: 'dh-btn', onclick: function () { views.hardware(true); } }, 'Re-check')),
-                    h('div', { class: 'dh-small dh-muted', style: 'margin-top:6px' }, 'Kernel ' + r.kernel + ' · Secure Boot ' + r.secureBoot + (r.container ? ' · dvbhub runs in a container' : '') + ' · adapters: ' + ((r.adapters || []).join(', ') || 'none')),
-                    (r.notes || []).map(function (n) { return h('div', { class: 'dh-small', style: 'margin-top:6px' }, 'ℹ ' + n); })),
-                h('div', { class: 'dh-card dh-wrap' }, h('table', { class: 'dh-t' },
-                    h('tr', {}, ['Device', 'Brand', 'ID', 'Driver', 'Status'].map(function (x) { return h('th', {}, x); })),
-                    (r.devices || []).length ? r.devices.map(function (dev) {
-                        return [h('tr', {}, h('td', {}, h('b', {}, dev.name), ' ', h('span', { class: 'dh-small dh-muted' }, dev.bus)), h('td', {}, dev.brand), h('td', { class: 'dh-mono' }, dev.id), h('td', { class: 'dh-mono' }, dev.driver || '–'), h('td', {}, stBadge(dev.status), ' ', (dev.adapters || []).join(', '))),
-                            (dev.hints || []).length ? h('tr', {}, h('td', { colspan: 5, class: 'dh-small dh-muted' }, dev.hints.map(function (x) { return h('div', {}, '→ ' + x); }))) : null];
-                    }) : h('tr', {}, h('td', { colspan: 5, class: 'dh-muted' }, 'No tuner devices detected.')))),
-                (r.firmware || []).length ? h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Firmware'),
-                    r.firmware.map(function (f) { return h('div', { class: 'dh-row dh-small' }, h('span', { class: 'dh-mono' }, f.file), h('span', { class: 'dh-muted' }, f.module), f.required ? h('span', { class: 'dh-badge dh-badb' }, 'failed to load') : h('span', { class: 'dh-badge dh-warnb' }, 'not installed')); })) : null,
-                installer(inst, d.actions, r.actions || []));
-            if ((inst.jobs || []).some(function (j) { return j.status === 'queued' || j.status === 'running'; })) {
-                timer = setTimeout(function () { if (currentTab === 'hardware') views.hardware(); }, 3000);
-            }
-        });
-    };
-    function installer(inst, actions, suggested) {
-        var card = h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Driver & firmware installer'));
-        if (!inst.enabled) {
-            card.appendChild(h('div', { class: 'dh-small' }, 'The installer needs root on the dvbhub host. Run this once on the host to enable these buttons (use /var/lib/dvbhub for a native install, or the ./data folder next to docker-compose.yml):'));
-            card.appendChild(h('div', { class: 'dh-mono', style: 'margin-top:8px' }, inst.command));
-            return card;
+    // The colour behind Jellyfin's pages, for dvbhub's dialogs.
+    function pageBackground() {
+        for (var el = page; el; el = el.parentElement) {
+            var c = getComputedStyle(el).backgroundColor;
+            if (c && c !== 'transparent' && c.indexOf('rgba(0, 0, 0, 0)') !== 0) return c;
         }
-        card.appendChild(h('div', { class: 'dh-small dh-muted' }, 'Enabled on ' + (inst.host || 'host') + '. Only these fixed actions can run:'));
-        Object.keys(actions || {}).forEach(function (a) {
-            card.appendChild(h('div', { class: 'dh-row', style: 'margin-top:8px' },
-                h('button', { class: 'dh-btn' + (suggested.indexOf(a) >= 0 ? ' pri' : ''), onclick: function () {
-                    if (!confirm('Run "' + a + '" on the host?\n\n' + actions[a])) return;
-                    act(api('POST', 'hardware/install', { action: a }), 'Queued "' + a + '"').then(function () { views.hardware(); });
-                } }, 'Run: ' + a), h('span', { class: 'dh-small' }, actions[a])));
-        });
-        (inst.jobs || []).forEach(function (j) {
-            var pre = h('pre', { class: 'dh-log' }, '…');
-            var det = h('details', { style: 'margin-top:8px' }, h('summary', {}, j.action + ' · ' + fmtDate(j.created) + ' · ', h('span', { class: 'dh-badge ' + ({ ok: 'dh-good', failed: 'dh-badb', running: 'dh-acc', queued: 'dh-warnb' }[j.status] || '') }, j.status),
-                j.rebootRecommended && j.status === 'ok' ? h('span', { class: 'dh-badge dh-warnb', style: 'margin-left:6px' }, 'replug / reboot to load') : null), pre);
-            det.addEventListener('toggle', function () { if (det.open) get('hardware/jobs/' + j.id).then(function (x) { pre.textContent = x.log || '(no output yet)'; }); });
-            card.appendChild(det);
-        });
-        return card;
+        return getComputedStyle(document.body).backgroundColor || '#202020';
     }
 
-    // ---------- setup ----------
-    function addTuner(url, name) {
-        // Uses Jellyfin's own Live TV API: add dvbhub as an HDHomeRun tuner and its XMLTV guide.
-        var base = (config.DvbHubUrl || '').replace(/\/$/, '');
-        return ApiClient.getNamedConfiguration('livetv').then(function (lt) {
-            var hosts = lt.TunerHosts || [], provs = lt.ListingProviders || [];
-            var jobs = [];
-            if (!hosts.some(function (x) { return (x.Url || '').replace(/\/$/, '') === url; })) {
-                jobs.push(ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('LiveTv/TunerHosts'), contentType: 'application/json',
-                    data: JSON.stringify({ Type: 'hdhomerun', Url: url, FriendlyName: 'dvbhub ' + (name || ''), ImportFavoritesOnly: false, AllowHWTranscoding: true, EnableStreamLooping: false }) }));
-            }
-            if (!provs.some(function (x) { return x.Type === 'xmltv' && (x.Path || '') === base + '/xmltv.xml'; })) {
-                jobs.push(ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('LiveTv/ListingProviders', { validateListings: false, validateLogin: false }), contentType: 'application/json',
-                    data: JSON.stringify({ Type: 'xmltv', Path: base + '/xmltv.xml', EnableAllTuners: true }) }));
-            }
-            if (!jobs.length) { toast('Already added to Jellyfin Live TV.'); return; }
-            return Promise.all(jobs).then(function () { toast('Added to Jellyfin Live TV. Jellyfin will refresh the guide shortly.'); });
-        }).catch(function (e) { toast('Could not add to Live TV: ' + (e && e.message ? e.message : e)); });
+    function showConn(on) { $('#dhpConn').style.display = on ? '' : 'none'; }
+    function setState(text, bad) { var s = $('#dhpState'); s.textContent = text; s.className = 'dhp-state' + (bad ? ' dhp-err' : ''); }
+
+    function loadUI() {
+        if (app) { try { app.destroy(); } catch (e) { } app = null; }
+        var mount = $('#dhpMount');
+        mount.textContent = 'Loading…';
+        return Promise.all([fetchText('DvbHub/Ui/app.css'), fetchText('DvbHub/Ui/app.js')]).then(function (r) {
+            var style = document.getElementById('dvbhub-ui-css');
+            if (!style) { style = document.createElement('style'); style.id = 'dvbhub-ui-css'; document.head.appendChild(style); }
+            style.textContent = r[0];
+            (new Function(r[1]))();
+            var host = { embedded: true, api: call, jellyfin: jellyfin, modalBg: pageBackground() };
+            return window.DvbHubUI.mount(mount, host).then(function (a) {
+                app = a;
+                setState(a.status ? 'Connected to ' + config.DvbHubUrl + ' · dvbhub ' + a.status.version : 'Not connected', !a.status);
+                if (!a.status) showConn(true);
+            });
+        }).catch(function (e) {
+            mount.textContent = '';
+            setState('Not connected: ' + e.message, true);
+            showConn(true);
+        });
     }
 
-    views.setup = function () {
-        var url = h('input', { class: 'dh-in', value: config.DvbHubUrl, style: 'min-width:280px' });
-        var pw = h('input', { class: 'dh-in', type: 'password', value: config.AdminPassword, placeholder: '(none)' });
-        var status = h('div', { class: 'dh-small', style: 'margin-top:10px' });
-        function save() {
-            config.DvbHubUrl = url.value.trim().replace(/\/$/, '');
-            config.AdminPassword = pw.value;
-            return ApiClient.updatePluginConfiguration(pluginId, config).then(function (r) { Dashboard.processPluginConfigurationUpdateResult(r); updateHeader(); });
-        }
-        function test() {
-            status.textContent = 'Testing…';
-            return get('status?history=0').then(function (st) {
-                fill(status,h('span', { class: 'dh-badge dh-good' }, 'Connected'), ' ' + st.tuners.length + ' tuner(s), ' + st.counts.channels + ' channels');
-            }).catch(function (e) { fill(status,h('span', { class: 'dh-badge dh-badb' }, 'Failed'), ' ' + e.message); });
-        }
-        fill($('#dhView'),
-            h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Connection'),
-                h('div', { class: 'dh-small dh-muted', style: 'margin-bottom:10px' }, 'The address of dvbhub as seen from the Jellyfin server (e.g. http://192.168.1.10:9980, or http://dvbhub:9980 on a shared Docker network).'),
-                h('div', { class: 'dh-form' }, h('label', { class: 'dh-f' }, 'dvbhub URL', url), h('label', { class: 'dh-f' }, 'dvbhub admin password', pw),
-                    h('div', { class: 'dh-row' }, h('button', { class: 'dh-btn pri', onclick: function () { save().then(test); } }, 'Save & test'))),
-                status),
-            h('div', { class: 'dh-card' }, h('h3', { style: 'margin-top:0' }, 'Jellyfin Live TV'),
-                h('div', { class: 'dh-small', style: 'margin-bottom:10px' }, 'Adds dvbhub to Jellyfin as an HDHomeRun tuner plus its XMLTV guide. Jellyfin then shows the channels under Live TV and records with its own DVR.'),
-                h('button', { class: 'dh-btn pri', onclick: function () { addTuner((config.DvbHubUrl || '').replace(/\/$/, ''), ''); } }, 'Add dvbhub to Live TV'),
-                h('span', { class: 'dh-small dh-muted', style: 'margin-left:10px' }, 'For a GPU-transcoded variant use "+ Add as Jellyfin tuner" on the Transcoding tab.')));
-        return test();
+    function save() {
+        var url = $('#dhpUrl').value.trim().replace(/\/+$/, '');
+        if (url && !/^https?:\/\//i.test(url)) url = 'http://' + url;
+        config.DvbHubUrl = url;
+        config.AdminPassword = $('#dhpPw').value;
+        $('#dhpResult').textContent = 'Connecting…';
+        return ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
+            $('#dhpUrl').value = url;
+            $('#dhpOpen').href = url; $('#dhpOpen').style.display = url ? '' : 'none';
+            return call('GET', 'status').then(function (st) {
+                $('#dhpResult').textContent = 'Connected: ' + st.tuners.length + ' tuner(s), ' + st.counts.channels + ' channel(s).';
+                showConn(false);
+                return loadUI();
+            });
+        }).catch(function (e) { $('#dhpResult').innerHTML = ''; var s = document.createElement('span'); s.className = 'dhp-err'; s.textContent = 'Could not connect: ' + e.message; $('#dhpResult').appendChild(s); });
     }
 
-    function updateHeader() {
-        $('#dhConn').textContent = config.DvbHubUrl ? 'dvbhub at ' + config.DvbHubUrl : 'not configured';
-        $('#dhOpenFull').setAttribute('href', config.DvbHubUrl || '#');
-    }
+    $('#dhpConnBtn').addEventListener('click', function () { showConn($('#dhpConn').style.display === 'none'); });
+    $('#dhpSave').addEventListener('click', save);
 
     page.addEventListener('pageshow', function () {
-        Dashboard.showLoadingMsg();
         ApiClient.getPluginConfiguration(pluginId).then(function (c) {
             config = c;
-            updateHeader();
-            Dashboard.hideLoadingMsg();
-            show(config.DvbHubUrl ? 'overview' : 'setup');
+            var url = config.DvbHubUrl || '';
+            $('#dhpUrl').value = url || ('http://' + window.location.hostname + ':9980');
+            $('#dhpPw').value = config.AdminPassword || '';
+            $('#dhpOpen').href = url; $('#dhpOpen').style.display = url ? '' : 'none';
+            if (!url) {
+                setState('Not set up yet');
+                showConn(true);
+                $('#dhpResult').textContent = 'Check the address, then press Save and connect.';
+                return;
+            }
+            setState('Connecting to ' + url + '…');
+            return loadUI();
         });
     });
     page.addEventListener('pagehide', function () {
-        clearInterval(timer); clearTimeout(timer);
-        if (cleanup) { try { cleanup(); } catch (e) { } cleanup = null; }
+        if (app) { try { app.destroy(); } catch (e) { } app = null; }
     });
 })();
 </script>
